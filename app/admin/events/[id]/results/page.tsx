@@ -1,8 +1,8 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { ResultsTable } from "@/components/admin/results-table";
-import { getActiveEvent, getAuditLog } from "@/lib/queries";
+import { getEventById, getAuditLog } from "@/lib/queries";
 import { computeStandings } from "@/lib/standings";
 import { formatStockholm } from "@/lib/time";
 
@@ -23,13 +23,15 @@ const ACTION_LABELS: Record<string, string> = {
   set_payment: "Ändrade betalningsstatus",
 };
 
-export default async function AdminResultsPage() {
+export default async function AdminResultsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   if (!(await isAdmin())) redirect("/admin/login");
-  const event = await getActiveEvent();
-
-  if (!event) {
-    return <Card className="p-6 text-center text-sm text-muted">Inget event ännu.</Card>;
-  }
+  const { id } = await params;
+  const event = await getEventById(id);
+  if (!event) notFound();
 
   const [standings, audit] = await Promise.all([
     computeStandings(event.id),
