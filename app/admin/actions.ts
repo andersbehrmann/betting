@@ -221,6 +221,8 @@ export async function savePlayers(
 export async function setBettingOpen(eventId: string, open: boolean): Promise<Result> {
   const g = await guard();
   if (g) return g;
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   await qSetBettingOpen(eventId, open);
   await insertAudit(eventId, "admin", open ? "open_betting" : "close_betting", null, null);
   revalidateAdmin();
@@ -234,6 +236,8 @@ export async function toggleEventFlag(
 ): Promise<Result> {
   const g = await guard();
   if (g) return g;
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   await setEventFlag(eventId, flag, value);
   revalidateAdmin();
   return { ok: true };
@@ -407,6 +411,8 @@ export async function setPaymentStatus(
 ): Promise<Result> {
   const g = await guard();
   if (g) return g;
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   await qSetPaymentStatus(participantId, status);
   await insertAudit(eventId, "admin", "set_payment", null, { participantId, status });
   revalidateAdmin();
