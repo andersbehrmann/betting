@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { addCustomGame } from "@/app/admin/actions";
 
-export function AddGameForm({ defaultStake }: { defaultStake: number }) {
+export function AddGameForm({ eventId, defaultStake }: { eventId: string; defaultStake: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -36,7 +36,7 @@ export function AddGameForm({ defaultStake }: { defaultStake: number }) {
       return;
     }
     startTransition(async () => {
-      const res = await addCustomGame({
+      const res = await addCustomGame(eventId, {
         title,
         description: description || null,
         stake: Number(stake),

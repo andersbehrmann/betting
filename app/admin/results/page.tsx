@@ -45,7 +45,7 @@ export default async function AdminResultsPage() {
         <p className="text-sm text-muted">Insats, vinst, netto och betalningsstatus per deltagare.</p>
       </div>
 
-      <ResultsTable participants={ranked} currency={event.currency} />
+      <ResultsTable eventId={event.id} participants={ranked} currency={event.currency} />
 
       <div>
         <h2 className="mb-2 px-1 font-display text-lg font-bold text-pitch">Historik</h2>

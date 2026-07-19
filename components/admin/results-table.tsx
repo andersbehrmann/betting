@@ -13,7 +13,7 @@ const STATUSES: { value: PaymentStatus; label: string }[] = [
   { value: "settled", label: "Klart" },
 ];
 
-function PaymentControl({ id, status }: { id: string; status: PaymentStatus }) {
+function PaymentControl({ eventId, id, status }: { eventId: string; id: string; status: PaymentStatus }) {
   const [isPending, startTransition] = useTransition();
   return (
     <div className="inline-flex overflow-hidden rounded-lg border border-line">
@@ -22,7 +22,7 @@ function PaymentControl({ id, status }: { id: string; status: PaymentStatus }) {
           key={s.value}
           type="button"
           disabled={isPending}
-          onClick={() => startTransition(() => void setPaymentStatus(id, s.value))}
+          onClick={() => startTransition(() => void setPaymentStatus(eventId, id, s.value))}
           className={cn(
             "px-2.5 py-1 text-xs font-medium transition-colors",
             status === s.value
@@ -69,9 +69,11 @@ function NoteInput({ id, initial }: { id: string; initial: string }) {
 }
 
 export function ResultsTable({
+  eventId,
   participants,
   currency,
 }: {
+  eventId: string;
   participants: ParticipantStanding[];
   currency: string;
 }) {
@@ -94,7 +96,7 @@ export function ResultsTable({
         <div key={p.id} className="px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium text-ink">{p.name}</span>
-            <PaymentControl id={p.id} status={p.paymentStatus} />
+            <PaymentControl eventId={eventId} id={p.id} status={p.paymentStatus} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="text-muted">

@@ -22,7 +22,15 @@ export interface SettingsFormValues {
   packageTiebreakExact: boolean;
 }
 
-export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; isNew: boolean }) {
+export function SettingsForm({
+  eventId,
+  initial,
+  isNew,
+}: {
+  eventId: string;
+  initial: SettingsFormValues;
+  isNew: boolean;
+}) {
   const router = useRouter();
   const [v, setV] = useState<SettingsFormValues>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +53,7 @@ export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; 
       starListenTarget: v.starListenTarget || null,
     };
     startTransition(async () => {
-      const res = await saveEventSettings(raw);
+      const res = await saveEventSettings(eventId, raw);
       if (!res.ok) {
         setError(res.error);
         return;

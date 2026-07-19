@@ -73,6 +73,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       <AdminControls
+        eventId={event.id}
         bettingOpen={event.bettingOpen}
         deadlinePassed={deadlinePassed}
         leaderboardVisible={event.leaderboardVisible}
@@ -104,6 +105,7 @@ export default async function AdminOverviewPage() {
           return (
             <GameAdminCard
               key={game.id}
+              eventId={event.id}
               view={view}
               status={game.status}
               bettingOpen={game.bettingOpen}

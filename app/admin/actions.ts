@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearUserSession, isAdmin, getCurrentUser } from "@/lib/auth";
 import {
-  getActiveEvent,
+  getEventById,
   getGames,
   getGameById,
   updateEventSettings,
@@ -185,22 +185,17 @@ async function createGamesForEvent(eventId: string, defaultStake: number, jackpo
   }
 }
 
-export async function saveEventSettings(raw: SettingsInputRaw): Promise<Result> {
+export async function saveEventSettings(eventId: string, raw: SettingsInputRaw): Promise<Result> {
   const g = await guard();
   if (g) return g;
   const parsed = settingsSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const settings = toEventSettings(parsed.data);
 
-  const existing = await getActiveEvent();
-  if (existing) {
-    await updateEventSettings(existing.id, settings);
-    await insertAudit(existing.id, "admin", "update_settings", null, null);
-  } else {
-    const id = await createEvent({ ...settings, slug: slugify(settings.name) });
-    await createGamesForEvent(id, settings.defaultStake, settings.jackpotStake);
-    await insertAudit(id, "admin", "create_event", null, null);
-  }
+  const existing = await getEventById(eventId);
+  if (!existing) return { ok: false, error: "Eventet finns inte." };
+  await updateEventSettings(existing.id, settings);
+  await insertAudit(existing.id, "admin", "update_settings", null, null);
   revalidateAdmin();
   return { ok: true };
 }
@@ -223,26 +218,23 @@ export async function savePlayers(
   return { ok: true };
 }
 
-export async function setBettingOpen(open: boolean): Promise<Result> {
+export async function setBettingOpen(eventId: string, open: boolean): Promise<Result> {
   const g = await guard();
   if (g) return g;
-  const event = await getActiveEvent();
-  if (!event) return { ok: false, error: "Inget event." };
-  await qSetBettingOpen(event.id, open);
-  await insertAudit(event.id, "admin", open ? "open_betting" : "close_betting", null, null);
+  await qSetBettingOpen(eventId, open);
+  await insertAudit(eventId, "admin", open ? "open_betting" : "close_betting", null, null);
   revalidateAdmin();
   return { ok: true };
 }
 
 export async function toggleEventFlag(
+  eventId: string,
   flag: "leaderboard_visible" | "bets_public",
   value: boolean,
 ): Promise<Result> {
   const g = await guard();
   if (g) return g;
-  const event = await getActiveEvent();
-  if (!event) return { ok: false, error: "Inget event." };
-  await setEventFlag(event.id, flag, value);
+  await setEventFlag(eventId, flag, value);
   revalidateAdmin();
   return { ok: true };
 }
@@ -277,15 +269,15 @@ const customGameSchema = z.object({
 export type CustomGameInputRaw = z.input<typeof customGameSchema>;
 
 /** Skapar ett eget flervalsspel som kan läggas till när som helst under kvällen. */
-export async function addCustomGame(raw: CustomGameInputRaw): Promise<Result> {
+export async function addCustomGame(eventId: string, raw: CustomGameInputRaw): Promise<Result> {
   const g = await guard();
   if (g) return g;
   const parsed = customGameSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Ogiltigt spel (minst 2 svarsalternativ krävs)." };
   }
-  const event = await getActiveEvent();
-  if (!event) return { ok: false, error: "Inget event." };
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
 
   const data = parsed.data;
   const options = data.options.map((label, i) => ({ value: `o${i}`, label }));
@@ -337,11 +329,11 @@ export async function saveFacit(gameId: string, rawResult: unknown): Promise<Res
 }
 
 /** Bygger matchpaketets facit från de ordinarie spelens facit och räknar om. */
-export async function settlePackage(): Promise<Result> {
+export async function settlePackage(eventId: string): Promise<Result> {
   const g = await guard();
   if (g) return g;
-  const event = await getActiveEvent();
-  if (!event) return { ok: false, error: "Inget event." };
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   const games = await getGames(event.id);
   const pkg = games.find((x) => x.gameKey === PACKAGE_GAME_KEY);
   if (!pkg) return { ok: false, error: "Matchpaketet saknas." };
@@ -408,12 +400,15 @@ export async function setManualWinners(gameId: string, participantIds: string[])
 
 // --- Deltagare / betalning ---
 
-export async function setPaymentStatus(participantId: string, status: PaymentStatus): Promise<Result> {
+export async function setPaymentStatus(
+  eventId: string,
+  participantId: string,
+  status: PaymentStatus,
+): Promise<Result> {
   const g = await guard();
   if (g) return g;
   await qSetPaymentStatus(participantId, status);
-  const event = await getActiveEvent();
-  if (event) await insertAudit(event.id, "admin", "set_payment", null, { participantId, status });
+  await insertAudit(eventId, "admin", "set_payment", null, { participantId, status });
   revalidateAdmin();
   return { ok: true };
 }
