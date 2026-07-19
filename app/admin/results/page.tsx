@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { ResultsTable } from "@/components/admin/results-table";
+import { SettlementList } from "@/components/settlement-list";
 import { getActiveEvent, getAuditLog } from "@/lib/queries";
 import { computeStandings } from "@/lib/standings";
 import { formatStockholm } from "@/lib/time";
@@ -46,6 +47,8 @@ export default async function AdminResultsPage() {
       </div>
 
       <ResultsTable participants={ranked} currency={event.currency} />
+
+      <SettlementList participants={standings.participants} currency={event.currency} />
 
       <div>
         <h2 className="mb-2 px-1 font-display text-lg font-bold text-pitch">Historik</h2>
