@@ -15,19 +15,6 @@ export default async function EventsPage() {
       <SiteHeader right={<AuthNav />} />
 
       <main className="mx-auto max-w-xl px-4 pb-16 pt-6">
-        {/* Publik intro – vad handlar det om? */}
-        <section className="mb-8">
-          <h1 className="font-display text-3xl font-bold text-pitch">Tävla med dina vänner</h1>
-          <p className="mt-2 text-muted">
-            En plattform för att tippa och tävla kring event – från VM-finaler till Crossfit Games.
-            Skapa ett gratis konto, anslut dig till ett event och klättra på leaderboarden.
-          </p>
-          <p className="mt-2 text-sm text-muted">
-            Betting-event bygger på att deltagarna gör upp sinsemellan – vi håller koll på tips,
-            resultat och ställning. Poäng-event ger poäng för rätt svar.
-          </p>
-        </section>
-
         <h2 className="mb-3 font-display text-lg font-bold text-pitch">Aktuella event</h2>
 
         {events.length === 0 ? (
