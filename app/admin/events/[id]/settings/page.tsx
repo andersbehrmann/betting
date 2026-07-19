@@ -1,31 +1,23 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
-import { Card } from "@/components/ui";
 import { SettingsForm, type SettingsFormValues } from "@/components/admin/settings-form";
 import { PlayersEditor } from "@/components/admin/players-editor";
 import { GameToggles } from "@/components/admin/game-toggles";
 import { AddGameForm } from "@/components/admin/add-game-form";
-import { getActiveEvent, getGames, getPlayers } from "@/lib/queries";
+import { getEventById, getGames, getPlayers } from "@/lib/queries";
 import { toDatetimeLocal } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   if (!(await isAdmin())) redirect("/admin/login");
-  const event = await getActiveEvent();
-
-  if (!event) {
-    return (
-      <Card className="p-6 text-center">
-        <p className="font-display text-lg text-pitch">Inget event skapat ännu</p>
-        <p className="mt-1 text-sm text-muted">Skapa ett event under Event.</p>
-        <Link href="/admin/events" className="mt-3 inline-block font-medium text-grass hover:underline">
-          Till event →
-        </Link>
-      </Card>
-    );
-  }
+  const { id } = await params;
+  const event = await getEventById(id);
+  if (!event) notFound();
 
   const values: SettingsFormValues = {
     name: event.name,
