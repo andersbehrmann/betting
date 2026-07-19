@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Card, Badge, GameStatusBadge, PaymentBadge, StatPill } from "@/components/ui";
 import {
-  getActiveEvent,
+  getEventBySlug,
   getGames,
   getPlayers,
   getParticipantByToken,
@@ -17,15 +18,20 @@ import { formatMoney, cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function MyBetsPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ submitted?: string }>;
 }) {
+  const { slug } = await params;
   const sp = await searchParams;
-  const event = await getActiveEvent();
+  const event = await getEventBySlug(slug);
+  if (!event || event.status === "draft") notFound();
+
   const token = await getParticipantToken();
   const participant = token ? await getParticipantByToken(token) : null;
-  const joined = event && participant && participant.eventId === event.id;
+  const joined = participant && participant.eventId === event.id;
 
   return (
     <>
@@ -46,7 +52,7 @@ export default async function MyBetsPage({
             </Link>
           </Card>
         ) : (
-          <Receipt event={event!} participantId={participant!.id} justSubmitted={sp.submitted === "1"} />
+          <Receipt event={event} participantId={participant!.id} justSubmitted={sp.submitted === "1"} />
         )}
       </main>
     </>
@@ -58,7 +64,7 @@ async function Receipt({
   participantId,
   justSubmitted,
 }: {
-  event: NonNullable<Awaited<ReturnType<typeof getActiveEvent>>>;
+  event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>>;
   participantId: string;
   justSubmitted: boolean;
 }) {
