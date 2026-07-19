@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { MatchBanner } from "@/components/match-banner";
 import { JoinForm } from "@/components/participant/join-form";
@@ -6,7 +7,7 @@ import { BettingBoard } from "@/components/participant/betting-board";
 import { AuthNav } from "@/components/auth/auth-nav";
 import { Card } from "@/components/ui";
 import {
-  getActiveEvent,
+  getEventBySlug,
   getGames,
   getPlayers,
   getParticipantByToken,
@@ -19,8 +20,10 @@ import { describeAnswer } from "@/lib/describe";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const event = await getActiveEvent();
+export default async function PlayPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const event = await getEventBySlug(slug);
+  if (!event || event.status === "draft") notFound();
 
   return (
     <>
@@ -44,16 +47,7 @@ export default async function HomePage() {
       />
 
       <main className="mx-auto max-w-xl px-4 pt-4">
-        {!event ? (
-          <Card className="p-6 text-center">
-            <p className="font-display text-lg text-pitch">Inget event är igång ännu</p>
-            <p className="mt-1 text-sm text-muted">
-              Admin behöver skapa kvällens match. Kika in igen strax!
-            </p>
-          </Card>
-        ) : (
-          <HomeContent event={event} />
-        )}
+        <HomeContent event={event} />
       </main>
 
       <footer className="mx-auto mt-10 max-w-xl px-4 pb-8 text-center text-xs text-muted">
@@ -65,7 +59,7 @@ export default async function HomePage() {
   );
 }
 
-async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<typeof getActiveEvent>>> }) {
+async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>> }) {
   const token = await getParticipantToken();
   const participant = token ? await getParticipantByToken(token) : null;
   const joined = participant && participant.eventId === event.id;
@@ -97,7 +91,7 @@ async function JoinedContent({
   participantName,
   locked,
 }: {
-  event: NonNullable<Awaited<ReturnType<typeof getActiveEvent>>>;
+  event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>>;
   participantId: string;
   participantName: string;
   locked: boolean;
