@@ -74,7 +74,7 @@ export function AdminControls({
       <div className="border-t border-line/60" />
       <Toggle
         label="Visa resultattavla"
-        hint="Gör /leaderboard synlig för deltagarna."
+        hint="Gör resultattavlan synlig för deltagarna."
         on={leaderboardVisible}
         disabled={isPending}
         onChange={(v) => startTransition(() => void toggleEventFlag(eventId, "leaderboard_visible", v))}

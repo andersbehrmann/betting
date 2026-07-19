@@ -39,7 +39,7 @@ export default async function AdminSettingsPage({
 
   return (
     <div className="space-y-5">
-      <SettingsForm eventId={event.id} initial={values} isNew={false} />
+      <SettingsForm eventId={event.id} initial={values} />
 
       <PlayersEditor
         eventId={event.id}

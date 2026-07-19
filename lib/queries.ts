@@ -198,23 +198,6 @@ export async function updateEventSettings(id: string, s: EventSettingsInput): Pr
     WHERE id = ${id}`;
 }
 
-export async function createEvent(input: EventSettingsInput & { slug: string }): Promise<string> {
-  const rows = await sql`
-    INSERT INTO events
-      (name, slug, team_one, team_two, match_start, betting_deadline, currency,
-       default_stake, jackpot_stake, star_player_name, star_listen_target,
-       count_staff_cards, closest_result_mode, package_tiebreak_exact)
-    VALUES
-      (${input.name}, ${input.slug}, ${input.teamOne}, ${input.teamTwo},
-       ${input.matchStart ? input.matchStart.toISOString() : null},
-       ${input.bettingDeadline ? input.bettingDeadline.toISOString() : null},
-       ${input.currency}, ${input.defaultStake}, ${input.jackpotStake},
-       ${input.starPlayerName}, ${input.starListenTarget}, ${input.countStaffCards},
-       ${input.closestResultMode}, ${input.packageTiebreakExact})
-    RETURNING id`;
-  return rows[0].id as string;
-}
-
 export async function setBettingOpen(eventId: string, open: boolean): Promise<void> {
   await sql`UPDATE events SET betting_open = ${open} WHERE id = ${eventId}`;
 }

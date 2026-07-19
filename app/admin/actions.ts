@@ -111,6 +111,8 @@ export async function setEventStatusAction(
 ): Promise<Result> {
   const g = await guard();
   if (g) return g;
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   await setEventStatus(eventId, status);
   revalidatePath("/admin/events");
   revalidatePath("/events");
@@ -182,6 +184,8 @@ export async function savePlayers(
   if (g) return g;
   const parsed = playersSchema.safeParse(players);
   if (!parsed.success) return { ok: false, error: "Ogiltig spelarlista." };
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
   await replacePlayers(eventId, parsed.data);
   await insertAudit(eventId, "admin", "update_players", null, { count: parsed.data.length });
   revalidateAdmin();
