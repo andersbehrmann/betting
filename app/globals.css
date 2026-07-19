@@ -1,26 +1,82 @@
 @import "tailwindcss";
 
+/*
+  Bettinglek – festlig fotbollsfinal.
+  Palett: pitch-grön (dominant) · varm cream (yta) · guld (jackpot-accent).
+*/
+
+@theme {
+  --color-pitch: #0c3b29;
+  --color-pitch-deep: #082a1d;
+  --color-grass: #1a8a54;
+  --color-grass-bright: #23a866;
+  --color-cream: #f6f3ea;
+  --color-cream-deep: #ede8da;
+  --color-ink: #14231b;
+  --color-muted: #5d6b62;
+  --color-line: #d9d3c4;
+  --color-gold: #e6a417;
+  --color-gold-soft: #f6e6c2;
+  --color-chalk: #fbfaf5;
+  --color-win: #1a8a54;
+  --color-lose: #b4472e;
+
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-dm-sans);
+
+  --radius-card: 1.15rem;
+  --radius-pill: 999px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: var(--color-cream);
+  --foreground: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(26, 138, 84, 0.12), transparent 60%),
+    var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Diskret gräs-mönster som festlig detalj i sidhuvudet. */
+.pitch-stripes {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 0 28px,
+    rgba(255, 255, 255, 0.10) 28px 56px
+  );
+}
+
+/* Fokusringar – tydliga och konsekventa. */
+*:focus-visible {
+  outline: 2px solid var(--color-grass);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-cream-deep);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: shimmer 1.4s infinite;
 }

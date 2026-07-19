@@ -1,0 +1,131 @@
+"use server";
+
+import { randomBytes } from "node:crypto";
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import {
+  getActiveEvent,
+  getEventById,
+  getGames,
+  participantNameExists,
+  createParticipant,
+  getParticipantByToken,
+  saveBets,
+  getBetsForParticipant,
+  type BetInput,
+} from "@/lib/queries";
+import { setParticipantToken, getParticipantToken } from "@/lib/auth";
+import { getGameDefinition } from "@/lib/scoring/games";
+import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
+import type { Answer } from "@/lib/scoring/types";
+
+type ActionResult = { ok: true } | { ok: false; error: string };
+
+function isLocked(event: { bettingOpen: boolean; bettingDeadline: Date }): boolean {
+  return !event.bettingOpen || Date.now() > event.bettingDeadline.getTime();
+}
+
+// --- Gå med (skapa deltagare) ---
+
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, "Namnet måste vara minst 2 tecken.")
+  .max(40, "Namnet får vara högst 40 tecken.");
+
+export async function joinEvent(eventId: string, rawName: string): Promise<ActionResult> {
+  const parsed = nameSchema.safeParse(rawName);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const name = parsed.data;
+
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
+  if (isLocked(event)) return { ok: false, error: "Tipsningen är stängd." };
+
+  if (await participantNameExists(eventId, name)) {
+    return { ok: false, error: "Namnet är redan taget i det här eventet. Välj ett annat." };
+  }
+
+  const token = randomBytes(16).toString("hex");
+  await createParticipant(eventId, name, token);
+  await setParticipantToken(token);
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// --- Skicka in tips ---
+
+const scoreSchema = z.object({
+  home: z.number().int().min(0).max(30),
+  away: z.number().int().min(0).max(30),
+});
+const optionSchema = z.object({ value: z.string().min(1).max(64) });
+const packageSchema = z.object({
+  world_champion: z.string().min(1).max(64).optional(),
+  result_90: scoreSchema.optional(),
+  first_scorer: z.string().min(1).max(64).optional(),
+  extra_time: z.string().min(1).max(64).optional(),
+});
+
+function validateAnswer(inputKind: string, raw: unknown): Answer | null {
+  if (inputKind === "score") {
+    const r = scoreSchema.safeParse(raw);
+    return r.success ? r.data : null;
+  }
+  if (inputKind === "package") {
+    const r = packageSchema.safeParse(raw);
+    if (!r.success) return null;
+    // Minst en del ifylld.
+    const d = r.data;
+    if (!d.world_champion && !d.result_90 && !d.first_scorer && !d.extra_time) return null;
+    return d;
+  }
+  // option / scorer
+  const r = optionSchema.safeParse(raw);
+  return r.success ? r.data : null;
+}
+
+export interface SubmitSelection {
+  gameId: string;
+  answer: unknown;
+}
+
+export async function submitBets(selections: SubmitSelection[]): Promise<ActionResult> {
+  const token = await getParticipantToken();
+  if (!token) return { ok: false, error: "Du är inte inloggad som deltagare." };
+  const participant = await getParticipantByToken(token);
+  if (!participant) return { ok: false, error: "Din deltagarsession är ogiltig." };
+
+  const event = await getActiveEvent();
+  if (!event || event.id !== participant.eventId) {
+    return { ok: false, error: "Eventet är inte aktivt." };
+  }
+  if (isLocked(event)) return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };
+
+  const games = await getGames(event.id, true);
+  const gameById = new Map(games.map((g) => [g.id, g]));
+
+  const selectedIds = new Set<string>();
+  const validated: BetInput[] = [];
+
+  for (const sel of selections) {
+    const game = gameById.get(sel.gameId);
+    if (!game) return { ok: false, error: "Ett valt spel finns inte längre." };
+    const def = getGameDefinition(game.gameKey);
+    const inputKind = def?.inputKind ?? (game.gameKey === PACKAGE_GAME_KEY ? "package" : "option");
+    const answer = validateAnswer(inputKind, sel.answer);
+    if (!answer) return { ok: false, error: `Ofullständigt tips i "${game.title}".` };
+    selectedIds.add(game.id);
+    // Insatsen bestäms server-side utifrån spelet – aldrig från klienten.
+    validated.push({ gameId: game.id, answer, stake: game.stake });
+  }
+
+  // Avvalda spel som deltagaren tidigare tippat på → tas bort.
+  const existing = await getBetsForParticipant(participant.id);
+  const removedGameIds = existing.filter((b) => !selectedIds.has(b.gameId)).map((b) => b.gameId);
+
+  await saveBets(participant.id, validated, removedGameIds);
+  revalidatePath("/");
+  revalidatePath("/my-bets");
+  return { ok: true };
+}

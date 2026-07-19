@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚽ Tipskvällen – privat bettinglek
 
-## Getting Started
+En liten, mobilanpassad webbapp för en privat bettinglek i samband med en fotbollsfinal.
+Tänkt för ~10–12 vänner under en kväll – småsummor, en gemensam länk, ingen kommersiell betting.
 
-First, run the development server:
+Deltagarna öppnar appen, skriver sitt namn, väljer vilka spel de vill vara med i, lägger sina
+tips, ser sin totala insats och skickar in före matchstart. Efteråt ser de vilka spel de vann
+och hur mycket de får tillbaka. Admin konfigurerar matchen, öppnar/stänger bettingen, lägger in
+facit efterhand och låter systemet räkna ut vinnare och utbetalningar.
+
+## Funktioner
+
+**Deltagare**
+- Gå med med bara ett namn (unik `access_token` sparas i cookie – återvänd på samma enhet)
+- Match-banner med live-nedräkning till tipsstopp
+- Välj spel med stora klickytor, se insats/spel och löpande totalsumma
+- Bekräfta totala insatsen innan inskick
+- Kvitto på `/my-bets` med insats, vinst, netto och betalningsstatus
+- Resultattavla på `/leaderboard` (när admin gör den synlig)
+
+**Admin** (`/admin`, lösenordsskyddad)
+- Skapa/konfigurera event: lag, tider, valuta, insatser, stjärnspelare m.m.
+- Öppna/stänga betting manuellt (utöver automatisk låsning vid deadline)
+- Aktivera/inaktivera enskilda spel, hantera spelarlista
+- Lägg in facit successivt per spel → automatisk vinnar- och utbetalningsuträkning
+- Se pott, antal deltagare och svarsfördelning per spel
+- Återöppna/korrigera facit, samt **manuell justering** av vinnare (markeras tydligt)
+- Slutsammanställning per deltagare + betalningsstatus (ej betalat / betalat / slutreglerat)
+- Enkel **audit-logg** – inget resultat raderas tyst
+
+## De 12 spelen + matchpaketet
+
+Världsmästare · Resultat efter 90 min · Första målskytt · Tid för första målet · Förlängning ·
+Straffläggning · Första gula kortet · Totalt antal gula kort · Straff under matchen · VAR-underkänt
+mål · Första gråtande supportern · Kommentatorn nämner stjärnspelaren.
+
+**Matchpaketet** är ett separat jackpotspel: tippa världsmästare, resultat, första målskytt och
+förlängning – 1 poäng per rätt del, flest poäng delar potten. En knapp kopierar deltagarens
+ordinarie svar till paketet. Exakt resultat kan användas som utslagsfråga (närmast vinner).
+
+## Teknisk stack
+
+- **Next.js 16** (App Router) + **TypeScript** + **React 19**
+- **Tailwind CSS v4** (egna, lättviktiga UI-komponenter)
+- **Neon** (serverless Postgres) via `@neondatabase/serverless`
+- **Zod** för server-side validering, **date-fns-tz** för Europe/Stockholm
+- **Vitest** för enhetstester av vinstberäkningen
+- Deploybar på **Vercel**
+
+### Arkitektur
+
+All databasåtkomst sker **server-side** (server actions / server components) med Neons
+connection string. Auktorisering sker i app-lagret:
+
+- **Deltagare** identifieras med en slumpad `access_token` i en httpOnly-cookie och kan bara
+  läsa/ändra sina egna tips – och bara före deadline.
+- **Admin** loggar in med `ADMIN_PASSWORD`; sessionen är en HMAC-signerad httpOnly-cookie.
+
+Klienten pratar aldrig direkt med databasen, så Postgres-RLS behövs inte – "RLS-kravet" uppfylls
+som app-lager-auktorisering. Inga hemligheter finns i frontend-koden.
+
+## Kom igång lokalt
+
+Krav: Node 20+ och ett Neon-projekt (gratisnivån räcker).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Installera beroenden
+npm install
+
+# 2. Skapa .env.local från mallen och fyll i värden
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fyll i `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variabel | Beskrivning |
+|---|---|
+| `DATABASE_URL` | Neon **pooled** connection string (Dashboard → Connect → Pooled connection) |
+| `ADMIN_PASSWORD` | Lösenord för `/admin` |
+| `SESSION_SECRET` | Lång slumpsträng: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` lokalt |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# 3. Kör migrationer + seed-data mot Neon
+npm run db:migrate
+npm run db:seed
 
-## Learn More
+# 4. Starta dev-servern
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Öppna http://localhost:3000 (deltagarvy) och http://localhost:3000/admin (adminlösenord).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### npm-scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Script | Gör |
+|---|---|
+| `npm run dev` | Startar Next.js dev-server |
+| `npm run build` / `npm start` | Produktionsbygge / -körning |
+| `npm test` | Kör vinstberäkningens enhetstester (Vitest) |
+| `npm run db:migrate` | Kör ej applicerade SQL-migrationer (`db:migrate -- --reset` bygger om från noll) |
+| `npm run db:seed` | Fyller på exempel-event, spelare, spel och deltagare |
+| `npm run db:reset` | `--reset`-migrering + seed |
 
-## Deploy on Vercel
+## Datamodell
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`events`, `players`, `participants`, `games`, `bets`, `game_winners`, `audit_log`.
+Se [`db/migrations/0001_init.sql`](db/migrations/0001_init.sql). Spelsvar och facit lagras som
+`jsonb` (`answer_data` / `result_data`) eftersom varje speltyp har olika struktur.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Vinstberäkning
+
+Ren, testbar domänlogik i [`lib/scoring/`](lib/scoring):
+
+- **Pott** = antal deltagare i spelet × insatsen. Vinnare delar potten lika.
+- **Resultat efter 90 min**: exakt rätt vinner; annars (om admin valt "närmast") rangordning på
+  lägst total avvikelse → rätt målskillnad → rätt totalt antal mål → annars delad vinst.
+- **Matchpaketet**: 1 poäng per rätt del; flest poäng delar potten; exakt resultat som utslag.
+- Beräkning sker i decimaler, visning i kronor med 2 decimaler. Vid ojämn delning kan en liten
+  öresdifferens uppstå (t.ex. 20 kr / 3 = 6,67 kr × 3 = 20,01 kr) – admin kan justera manuellt.
+
+Alla vinstberäkningar körs om automatiskt varje gång admin ändrar facit.
+
+Kör testerna:
+
+```bash
+npm test
+```
+
+## Deploy till Vercel
+
+1. Pusha repot till GitHub (konfigurerat mot `github.com/andersbehrmann/betting`).
+2. I Vercel: **Add New → Project** och importera GitHub-repot.
+3. Sätt miljövariabler i Vercel (Project → Settings → Environment Variables):
+   `DATABASE_URL`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `NEXT_PUBLIC_APP_URL`
+   (sätt `NEXT_PUBLIC_APP_URL` till din produktions-URL).
+4. Deploya. Migrationer/seed körs inte automatiskt – kör dem mot Neon en gång från din dator:
+   ```bash
+   npm run db:migrate   # med produktionens DATABASE_URL i .env.local
+   ```
+   (Kör `npm run db:seed` bara om du vill ha exempeldata i produktion.)
+
+## Antaganden & noteringar
+
+- **Ett event i taget** stöds i UI:t (senast skapade event är aktivt), men datamodellen är
+  `event_id`-scopad och förberedd för flera event.
+- Alla tider hanteras i **Europe/Stockholm**. Tider lagras som `timestamptz` (UTC) och tolkas/
+  visas i Stockholmstid i gränssnittet.
+- Deltagarnamn måste vara unikt inom ett event (case-insensitive).
+- Betting låses automatiskt vid deadline (server-side kontroll vid varje inskick) och kan låsas
+  tidigare manuellt av admin. Efter låsning är tipsen skrivskyddade.
+- Ett spel kostar bara pengar om deltagaren aktivt valt det.
+- **Säkerhet:** Om Neon-lösenordet delats i klartext under utvecklingen – rotera det i Neon-panelen
+  och uppdatera `DATABASE_URL` i `.env.local` och Vercel.
