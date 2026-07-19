@@ -38,8 +38,9 @@ export function GameToggles({
           >
             <span
               className={cn(
-                "absolute top-0.5 h-6 w-6 rounded-full bg-chalk shadow transition-transform",
-                g.active ? "translate-x-[1.375rem]" : "translate-x-0.5",
+                // left-0.5 pinnar basläget (annars ärvs elementets static position ~24px).
+                "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-chalk shadow transition-transform",
+                g.active ? "translate-x-5" : "translate-x-0",
               )}
             />
           </button>
