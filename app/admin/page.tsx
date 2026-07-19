@@ -51,6 +51,8 @@ export default async function AdminOverviewPage() {
       description: g.description,
       stake: g.stake,
       isJackpot: g.isJackpot,
+      isCustom: g.isCustom,
+      options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
     { one: event.teamOne, two: event.teamTwo },
@@ -104,6 +106,7 @@ export default async function AdminOverviewPage() {
               key={game.id}
               view={view}
               status={game.status}
+              bettingOpen={game.bettingOpen}
               result={game.resultData}
               betCount={stat?.betCount ?? gbets.length}
               pot={stat?.pot ?? 0}

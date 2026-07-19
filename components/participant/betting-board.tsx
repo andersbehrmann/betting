@@ -9,11 +9,20 @@ import { formatMoney, cn } from "@/lib/utils";
 import type { GameView } from "@/lib/view";
 import type { PackageAnswer, ScoreAnswer } from "@/lib/scoring/types";
 
+interface LockedItem {
+  title: string;
+  stake: number;
+  isJackpot: boolean;
+  answerText: string;
+  settled: boolean;
+}
+
 interface Props {
   currency: string;
   teams: { one: string; two: string };
   views: GameView[];
   initial: { gameId: string; answer: unknown }[];
+  locked?: LockedItem[];
 }
 
 function answerComplete(view: GameView, answer: unknown): boolean {
@@ -29,7 +38,7 @@ function answerComplete(view: GameView, answer: unknown): boolean {
   return Boolean((answer as { value?: string }).value);
 }
 
-export function BettingBoard({ currency, teams, views, initial }: Props) {
+export function BettingBoard({ currency, teams, views, initial, locked = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +80,9 @@ export function BettingBoard({ currency, teams, views, initial }: Props) {
   const selectedViews = views.filter((v) => selected.has(v.id));
   const total = selectedViews.reduce((sum, v) => sum + v.stake, 0);
   const count = selectedViews.length;
+
+  const lockedTotal = locked.reduce((sum, l) => sum + l.stake, 0);
+  const committedTotal = total + lockedTotal;
 
   const incomplete = selectedViews.filter((v) => !answerComplete(v, answers[v.id]));
 
@@ -164,6 +176,29 @@ export function BettingBoard({ currency, teams, views, initial }: Props) {
         />
       )}
 
+      {locked.length > 0 && (
+        <div className="pt-2">
+          <h2 className="px-1 pb-1 font-display text-base font-bold text-muted">Låsta spel</h2>
+          <p className="px-1 pb-2 text-xs text-muted">
+            Redan inskickade tips på spel som stängts. De räknas med i din totala insats.
+          </p>
+          <div className="space-y-2">
+            {locked.map((l, i) => (
+              <Card key={i} className="flex items-center justify-between gap-3 px-4 py-3 opacity-90">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium text-ink">{l.title}</span>
+                    {l.isJackpot && <Badge tone="gold">Jackpot</Badge>}
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-muted">Ditt tips: {l.answerText}</p>
+                </div>
+                <Badge tone={l.settled ? "gold" : "neutral"}>{l.settled ? "Avgjord" : "Stängd"}</Badge>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sticky summering + skicka in */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-cream/95 backdrop-blur-md">
         <div className="mx-auto max-w-xl px-4 py-3">
@@ -173,7 +208,7 @@ export function BettingBoard({ currency, teams, views, initial }: Props) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-wide text-muted">Din totala insats</div>
-              <div className="font-display text-2xl font-bold text-pitch">{formatMoney(total, currency)}</div>
+              <div className="font-display text-2xl font-bold text-pitch">{formatMoney(committedTotal, currency)}</div>
             </div>
             <Button size="md" className="px-7" onClick={openConfirm} disabled={isPending}>
               Skicka in
@@ -184,8 +219,9 @@ export function BettingBoard({ currency, teams, views, initial }: Props) {
 
       {confirmOpen && (
         <ConfirmSheet
-          total={total}
+          total={committedTotal}
           count={count}
+          lockedCount={locked.length}
           currency={currency}
           items={selectedViews.map((v) => ({ title: v.title, stake: v.stake, jackpot: v.isJackpot }))}
           pending={isPending}
@@ -359,6 +395,7 @@ function PackagePart({ label, children }: { label: string; children: React.React
 function ConfirmSheet({
   total,
   count,
+  lockedCount = 0,
   currency,
   items,
   pending,
@@ -367,6 +404,7 @@ function ConfirmSheet({
 }: {
   total: number;
   count: number;
+  lockedCount?: number;
   currency: string;
   items: { title: string; stake: number; jackpot: boolean }[];
   pending: boolean;
@@ -381,7 +419,10 @@ function ConfirmSheet({
       >
         <div className="px-5 py-5">
           <h3 className="font-display text-xl font-bold text-pitch">Bekräfta dina tips</h3>
-          <p className="mt-1 text-sm text-muted">Du deltar i {count} spel. Kontrollera din totala insats.</p>
+          <p className="mt-1 text-sm text-muted">
+            Du skickar in {count} spel
+            {lockedCount > 0 && ` (plus ${lockedCount} redan låsta)`}. Kontrollera din totala insats.
+          </p>
 
           <div className="my-4 max-h-56 space-y-1.5 overflow-y-auto">
             {items.map((it) => (

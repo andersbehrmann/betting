@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -18,6 +19,8 @@ import {
   setBettingOpen as qSetBettingOpen,
   setEventFlag,
   setGameActive,
+  setGameBettingOpen,
+  createCustomGame,
   setGameResult,
   setGameStatus,
   replacePlayers,
@@ -195,6 +198,54 @@ export async function toggleGame(gameId: string, active: boolean): Promise<Resul
   const g = await guard();
   if (g) return g;
   await setGameActive(gameId, active);
+  revalidateAdmin();
+  return { ok: true };
+}
+
+/** Öppnar/stänger betting för ett enskilt spel (oberoende av globalt tipsstopp). */
+export async function toggleGameBetting(gameId: string, open: boolean): Promise<Result> {
+  const g = await guard();
+  if (g) return g;
+  const game = await getGameById(gameId);
+  if (!game) return { ok: false, error: "Spel saknas." };
+  await setGameBettingOpen(gameId, open);
+  await insertAudit(game.eventId, "admin", open ? "open_game_betting" : "close_game_betting", gameId, null);
+  revalidateAdmin();
+  return { ok: true };
+}
+
+const customGameSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(300).nullable(),
+  stake: z.number().min(0).max(100000),
+  bettingOpen: z.boolean(),
+  options: z.array(z.string().trim().min(1).max(80)).min(2).max(12),
+});
+export type CustomGameInputRaw = z.input<typeof customGameSchema>;
+
+/** Skapar ett eget flervalsspel som kan läggas till när som helst under kvällen. */
+export async function addCustomGame(raw: CustomGameInputRaw): Promise<Result> {
+  const g = await guard();
+  if (g) return g;
+  const parsed = customGameSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Ogiltigt spel (minst 2 svarsalternativ krävs)." };
+  }
+  const event = await getActiveEvent();
+  if (!event) return { ok: false, error: "Inget event." };
+
+  const data = parsed.data;
+  const options = data.options.map((label, i) => ({ value: `o${i}`, label }));
+  const gameKey = `custom_${randomBytes(4).toString("hex")}`;
+
+  const id = await createCustomGame(event.id, gameKey, {
+    title: data.title,
+    description: data.description || null,
+    stake: data.stake,
+    options,
+    bettingOpen: data.bettingOpen,
+  });
+  await insertAudit(event.id, "admin", "add_custom_game", id, { title: data.title });
   revalidateAdmin();
   return { ok: true };
 }

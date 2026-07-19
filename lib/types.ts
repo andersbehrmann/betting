@@ -1,6 +1,6 @@
 // App-nivå datatyper (mappade från DB-rader – numbers/booleans/Date normaliserade).
 
-import type { GameResult, Answer, ClosestResultMode } from "./scoring/types";
+import type { GameResult, Answer, ClosestResultMode, GameOption } from "./scoring/types";
 
 export type PaymentStatus = "unpaid" | "paid" | "settled";
 export type GameStatus = "open" | "closed" | "awaiting_result" | "settled";
@@ -52,6 +52,9 @@ export interface GameRow {
   stake: number;
   isJackpot: boolean;
   active: boolean;
+  bettingOpen: boolean;
+  isCustom: boolean;
+  options: GameOption[] | null;
   sortOrder: number;
   resultData: GameResult | null;
   status: GameStatus;

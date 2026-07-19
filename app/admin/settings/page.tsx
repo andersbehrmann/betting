@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { SettingsForm, type SettingsFormValues } from "@/components/admin/settings-form";
 import { PlayersEditor } from "@/components/admin/players-editor";
 import { GameToggles } from "@/components/admin/game-toggles";
+import { AddGameForm } from "@/components/admin/add-game-form";
 import { getActiveEvent, getGames, getPlayers } from "@/lib/queries";
 import { toDatetimeLocal } from "@/lib/time";
 
@@ -68,9 +69,13 @@ export default async function AdminSettingsPage() {
             initialTeam2={players.filter((p) => p.team === 2).map((p) => p.name)}
           />
 
+          <AddGameForm defaultStake={event.defaultStake} />
+
           <div>
             <h2 className="mb-2 px-1 font-display text-lg font-bold text-pitch">Aktiva spel</h2>
-            <p className="mb-2 px-1 text-sm text-muted">Slå av spel som inte ska vara med i kväll.</p>
+            <p className="mb-2 px-1 text-sm text-muted">
+              Slå av spel som inte ska vara med i kväll. (Öppna/stäng betting per spel gör du under Översikt.)
+            </p>
             <GameToggles
               games={games.map((g) => ({
                 id: g.id,

@@ -13,6 +13,8 @@ import {
 } from "@/lib/queries";
 import { getParticipantToken } from "@/lib/auth";
 import { buildGameViews } from "@/lib/view";
+import { isGameBettable, isGloballyOpen } from "@/lib/betting";
+import { describeAnswer } from "@/lib/describe";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +64,7 @@ async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<ty
   const token = await getParticipantToken();
   const participant = token ? await getParticipantByToken(token) : null;
   const joined = participant && participant.eventId === event.id;
-  const locked = !event.bettingOpen || Date.now() > event.bettingDeadline.getTime();
+  const locked = !isGloballyOpen(event);
 
   return (
     <div className="space-y-4">
@@ -101,7 +103,7 @@ async function JoinedContent({
     getBetsForParticipant(participantId),
   ]);
 
-  const views = buildGameViews(
+  const allViews = buildGameViews(
     games.map((g) => ({
       id: g.id,
       gameKey: g.gameKey,
@@ -109,12 +111,37 @@ async function JoinedContent({
       description: g.description,
       stake: g.stake,
       isJackpot: g.isJackpot,
+      isCustom: g.isCustom,
+      options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
     { one: event.teamOne, two: event.teamTwo },
   );
+  const viewById = new Map(allViews.map((v) => [v.id, v]));
+  const betByGame = new Map(bets.map((b) => [b.gameId, b]));
 
-  const initial = bets.map((b) => ({ gameId: b.gameId, answer: b.answerData }));
+  // Öppna spel (går att lägga/ändra tips) vs stängda spel deltagaren redan tippat på.
+  const bettable = games.filter((g) => isGameBettable(g, event));
+  const bettableIds = new Set(bettable.map((g) => g.id));
+  const editableViews = bettable.map((g) => viewById.get(g.id)!);
+
+  const initial = bets
+    .filter((b) => bettableIds.has(b.gameId))
+    .map((b) => ({ gameId: b.gameId, answer: b.answerData }));
+
+  const lockedItems = games
+    .filter((g) => !bettableIds.has(g.id) && betByGame.has(g.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((g) => {
+      const v = viewById.get(g.id)!;
+      return {
+        title: g.title,
+        stake: g.stake,
+        isJackpot: g.isJackpot,
+        answerText: describeAnswer(v, betByGame.get(g.id)!.answerData, allViews),
+        settled: g.status === "settled",
+      };
+    });
 
   return (
     <div>
@@ -134,8 +161,9 @@ async function JoinedContent({
         <BettingBoard
           currency={event.currency}
           teams={{ one: event.teamOne, two: event.teamTwo }}
-          views={views}
+          views={editableViews}
           initial={initial}
+          locked={lockedItems}
         />
       )}
     </div>

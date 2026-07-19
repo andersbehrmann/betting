@@ -66,6 +66,9 @@ function mapGame(r: any): GameRow {
     stake: num(r.stake),
     isJackpot: r.is_jackpot,
     active: r.active,
+    bettingOpen: r.betting_open,
+    isCustom: r.is_custom,
+    options: r.options ?? null,
     sortOrder: r.sort_order,
     resultData: r.result_data,
     status: r.status,
@@ -246,6 +249,36 @@ export async function getGameById(id: string): Promise<GameRow | null> {
 
 export async function setGameActive(gameId: string, active: boolean): Promise<void> {
   await sql`UPDATE games SET active = ${active} WHERE id = ${gameId}`;
+}
+
+export async function setGameBettingOpen(gameId: string, open: boolean): Promise<void> {
+  await sql`UPDATE games SET betting_open = ${open} WHERE id = ${gameId}`;
+}
+
+export interface CustomGameInput {
+  title: string;
+  description: string | null;
+  stake: number;
+  options: { value: string; label: string }[];
+  bettingOpen: boolean;
+}
+
+/** Skapar ett eget (custom) flervalsspel. Returnerar spelets id. */
+export async function createCustomGame(
+  eventId: string,
+  gameKey: string,
+  input: CustomGameInput,
+): Promise<string> {
+  const nextOrder = await sql`SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM games WHERE event_id = ${eventId}`;
+  const sortOrder = num(nextOrder[0].n);
+  const rows = await sql`
+    INSERT INTO games
+      (event_id, game_key, title, description, stake, is_jackpot, is_custom, active, betting_open, sort_order, status, options)
+    VALUES
+      (${eventId}, ${gameKey}, ${input.title}, ${input.description}, ${input.stake},
+       false, true, true, ${input.bettingOpen}, ${sortOrder}, 'open', ${JSON.stringify(input.options)}::jsonb)
+    RETURNING id`;
+  return rows[0].id as string;
 }
 
 export async function setGameResult(gameId: string, result: GameResult | null): Promise<void> {

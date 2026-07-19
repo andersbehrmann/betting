@@ -15,6 +15,7 @@ import {
   type BetInput,
 } from "@/lib/queries";
 import { setParticipantToken, getParticipantToken } from "@/lib/auth";
+import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { getGameDefinition } from "@/lib/scoring/games";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
 import type { Answer } from "@/lib/scoring/types";
@@ -100,10 +101,14 @@ export async function submitBets(selections: SubmitSelection[]): Promise<ActionR
   if (!event || event.id !== participant.eventId) {
     return { ok: false, error: "Eventet är inte aktivt." };
   }
-  if (isLocked(event)) return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };
+  if (!isGloballyOpen(event)) {
+    return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };
+  }
 
-  const games = await getGames(event.id, true);
+  const games = await getGames(event.id);
   const gameById = new Map(games.map((g) => [g.id, g]));
+  // Bara spel som tar emot tips just nu får ändras.
+  const bettableIds = new Set(games.filter((g) => isGameBettable(g, event)).map((g) => g.id));
 
   const selectedIds = new Set<string>();
   const validated: BetInput[] = [];
@@ -111,6 +116,9 @@ export async function submitBets(selections: SubmitSelection[]): Promise<ActionR
   for (const sel of selections) {
     const game = gameById.get(sel.gameId);
     if (!game) return { ok: false, error: "Ett valt spel finns inte längre." };
+    if (!bettableIds.has(game.id)) {
+      return { ok: false, error: `Spelet "${game.title}" är stängt för tips.` };
+    }
     const def = getGameDefinition(game.gameKey);
     const inputKind = def?.inputKind ?? (game.gameKey === PACKAGE_GAME_KEY ? "package" : "option");
     const answer = validateAnswer(inputKind, sel.answer);
@@ -120,9 +128,12 @@ export async function submitBets(selections: SubmitSelection[]): Promise<ActionR
     validated.push({ gameId: game.id, answer, stake: game.stake });
   }
 
-  // Avvalda spel som deltagaren tidigare tippat på → tas bort.
+  // Ta ENDAST bort tips på spel som fortfarande är öppna och som deltagaren nu valt bort.
+  // Tips på stängda/dolda spel bevaras alltid → "allt samlat".
   const existing = await getBetsForParticipant(participant.id);
-  const removedGameIds = existing.filter((b) => !selectedIds.has(b.gameId)).map((b) => b.gameId);
+  const removedGameIds = existing
+    .filter((b) => bettableIds.has(b.gameId) && !selectedIds.has(b.gameId))
+    .map((b) => b.gameId);
 
   await saveBets(participant.id, validated, removedGameIds);
   revalidatePath("/");

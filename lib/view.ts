@@ -27,6 +27,8 @@ export interface GameLite {
   description: string | null;
   stake: number;
   isJackpot: boolean;
+  isCustom?: boolean;
+  options?: OptionView[] | null;
 }
 
 export interface PlayerLite {
@@ -40,6 +42,20 @@ export function buildGameView(
   players: PlayerLite[],
   teams: { one: string; two: string },
 ): GameView {
+  // Custom-spel: alltid flerval, med egna alternativ från DB.
+  if (game.isCustom) {
+    return {
+      id: game.id,
+      gameKey: game.gameKey,
+      title: game.title,
+      description: game.description,
+      stake: game.stake,
+      isJackpot: game.isJackpot,
+      inputKind: "option",
+      options: game.options ?? [],
+    };
+  }
+
   const def = getGameDefinition(game.gameKey);
   const inputKind = def?.inputKind ?? "option";
   let options: OptionView[] = [];

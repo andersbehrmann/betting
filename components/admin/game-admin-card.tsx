@@ -9,6 +9,7 @@ import {
   reopenGame,
   clearFacit,
   setManualWinners,
+  toggleGameBetting,
 } from "@/app/admin/actions";
 import { formatMoney, cn } from "@/lib/utils";
 import type { GameView } from "@/lib/view";
@@ -17,6 +18,7 @@ import type { GameStatus } from "@/lib/types";
 interface Props {
   view: GameView;
   status: GameStatus;
+  bettingOpen: boolean;
   result: unknown;
   betCount: number;
   pot: number;
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export function GameAdminCard(props: Props) {
-  const { view, status, result, betCount, pot, currency, distribution, winners, bettors, teams, isPackage } = props;
+  const { view, status, bettingOpen, result, betCount, pot, currency, distribution, winners, bettors, teams, isPackage } = props;
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [facit, setFacit] = useState<unknown>(result ?? undefined);
@@ -63,6 +65,29 @@ export function GameAdminCard(props: Props) {
         </div>
         <GameStatusBadge status={status} />
       </div>
+
+      {/* Öppna/stänga betting för det här spelet */}
+      {status !== "settled" && (
+        <div className="flex items-center justify-between gap-3 border-t border-line/70 px-4 py-2.5">
+          <span className="flex items-center gap-1.5 text-sm">
+            <span aria-hidden>{bettingOpen ? "🟢" : "🔒"}</span>
+            <span className={bettingOpen ? "text-grass" : "text-muted"}>
+              {bettingOpen ? "Tar emot tips" : "Stängt för tips"}
+            </span>
+          </span>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => run(() => toggleGameBetting(view.id, !bettingOpen))}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50",
+              bettingOpen ? "border-line text-muted hover:border-lose hover:text-lose" : "border-grass text-grass hover:bg-grass/10",
+            )}
+          >
+            {bettingOpen ? "Stäng spelet" : "Öppna spelet"}
+          </button>
+        </div>
+      )}
 
       {/* Svarsfördelning */}
       {distribution.length > 0 && (
