@@ -8,6 +8,7 @@ import { adminLogout } from "@/app/admin/actions";
 
 const TABS = [
   { href: "/admin", label: "Översikt" },
+  { href: "/admin/events", label: "Event" },
   { href: "/admin/settings", label: "Inställningar" },
   { href: "/admin/results", label: "Resultat" },
 ];

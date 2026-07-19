@@ -19,11 +19,12 @@ import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { getGameDefinition } from "@/lib/scoring/games";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
 import type { Answer } from "@/lib/scoring/types";
+import type { EventRow } from "@/lib/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-function isLocked(event: { bettingOpen: boolean; bettingDeadline: Date }): boolean {
-  return !event.bettingOpen || Date.now() > event.bettingDeadline.getTime();
+function isLocked(event: EventRow): boolean {
+  return !isGloballyOpen(event);
 }
 
 // --- Gå med (skapa deltagare) ---

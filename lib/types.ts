@@ -4,6 +4,9 @@ import type { GameResult, Answer, ClosestResultMode, GameOption } from "./scorin
 
 export type PaymentStatus = "unpaid" | "paid" | "settled";
 export type GameStatus = "open" | "closed" | "awaiting_result" | "settled";
+export type EventType = "betting" | "points";
+export type EventStatus = "draft" | "open" | "closed";
+export type JoinFeeStatus = "none" | "pending" | "paid" | "refunded";
 
 export interface UserRow {
   id: string;
@@ -17,10 +20,17 @@ export interface EventRow {
   id: string;
   name: string;
   slug: string;
-  teamOne: string;
-  teamTwo: string;
-  matchStart: Date;
-  bettingDeadline: Date;
+  eventType: EventType;
+  status: EventStatus;
+  joinFeeCents: number;
+  description: string | null;
+  coverImageUrl: string | null;
+  createdBy: string | null;
+  // Fotbollsspecifika fält – null för generiska/poäng-event.
+  teamOne: string | null;
+  teamTwo: string | null;
+  matchStart: Date | null;
+  bettingDeadline: Date | null;
   bettingOpen: boolean;
   currency: string;
   defaultStake: number;
@@ -45,9 +55,11 @@ export interface PlayerRow {
 export interface ParticipantRow {
   id: string;
   eventId: string;
+  userId: string | null;
   name: string;
-  accessToken: string;
+  accessToken: string | null;
   paymentStatus: PaymentStatus;
+  joinFeeStatus: JoinFeeStatus;
   adminNote: string | null;
 }
 

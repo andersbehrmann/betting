@@ -35,6 +35,9 @@ export default async function HomePage() {
                 Ligan
               </Link>
             )}
+            <Link href="/events" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+              Event
+            </Link>
             <AuthNav />
           </>
         }
@@ -117,7 +120,7 @@ async function JoinedContent({
       options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-    { one: event.teamOne, two: event.teamTwo },
+    { one: event.teamOne ?? "", two: event.teamTwo ?? "" },
   );
   const viewById = new Map(allViews.map((v) => [v.id, v]));
   const betByGame = new Map(bets.map((b) => [b.gameId, b]));
@@ -162,7 +165,7 @@ async function JoinedContent({
       ) : (
         <BettingBoard
           currency={event.currency}
-          teams={{ one: event.teamOne, two: event.teamTwo }}
+          teams={{ one: event.teamOne ?? "", two: event.teamTwo ?? "" }}
           views={editableViews}
           initial={initial}
           locked={lockedItems}

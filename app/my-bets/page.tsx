@@ -81,7 +81,7 @@ async function Receipt({
       options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-    { one: event.teamOne, two: event.teamTwo },
+    { one: event.teamOne ?? "", two: event.teamTwo ?? "" },
   );
   const viewById = new Map(views.map((v) => [v.id, v]));
   const gameById = new Map(games.map((g) => [g.id, g]));

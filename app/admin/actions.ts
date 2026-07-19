@@ -4,13 +4,15 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { clearUserSession, isAdmin } from "@/lib/auth";
+import { clearUserSession, isAdmin, getCurrentUser } from "@/lib/auth";
 import {
   getActiveEvent,
   getGames,
   getGameById,
   updateEventSettings,
   createEvent,
+  createPlatformEvent,
+  setEventStatus,
   setBettingOpen as qSetBettingOpen,
   setEventFlag,
   setGameActive,
@@ -56,6 +58,69 @@ function revalidateAdmin() {
 export async function adminLogout(): Promise<void> {
   await clearUserSession();
   redirect("/");
+}
+
+// --- Plattforms-event (generiska betting-/poäng-event) ---
+
+const createEventSchema = z.object({
+  name: z.string().trim().min(2, "Namnet måste vara minst 2 tecken.").max(120),
+  slug: z
+    .string()
+    .trim()
+    .min(2, "Slug måste vara minst 2 tecken.")
+    .max(60)
+    .regex(/^[a-z0-9-]+$/, "Slug: endast små bokstäver, siffror och bindestreck."),
+  eventType: z.enum(["betting", "points"]),
+  joinFeeKr: z.number().min(0).max(100000),
+  currency: z.string().trim().min(1).max(8),
+  description: z.string().trim().max(500).nullable(),
+  status: z.enum(["draft", "open", "closed"]),
+});
+
+export async function createEventAction(
+  input: z.infer<typeof createEventSchema>,
+): Promise<Result & { slug?: string }> {
+  const g = await guard();
+  if (g) return g;
+  const parsed = createEventSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const d = parsed.data;
+  const user = await getCurrentUser();
+
+  try {
+    await createPlatformEvent({
+      name: d.name,
+      slug: d.slug,
+      eventType: d.eventType,
+      joinFeeCents: Math.round(d.joinFeeKr * 100),
+      currency: d.currency,
+      description: d.description && d.description.length > 0 ? d.description : null,
+      status: d.status,
+      createdBy: user?.id ?? null,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("events_slug_key") || msg.includes("duplicate")) {
+      return { ok: false, error: "Slug är redan tagen. Välj en annan." };
+    }
+    console.error("[createEventAction]", err);
+    return { ok: false, error: "Kunde inte skapa eventet." };
+  }
+  revalidatePath("/admin/events");
+  revalidatePath("/events");
+  return { ok: true, slug: d.slug };
+}
+
+export async function setEventStatusAction(
+  eventId: string,
+  status: "draft" | "open" | "closed",
+): Promise<Result> {
+  const g = await guard();
+  if (g) return g;
+  await setEventStatus(eventId, status);
+  revalidatePath("/admin/events");
+  revalidatePath("/events");
+  return { ok: true };
 }
 
 // --- Event / inställningar ---

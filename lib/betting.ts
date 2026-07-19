@@ -2,9 +2,11 @@
 
 import type { EventRow, GameRow } from "./types";
 
-/** Är eventets betting öppen globalt (master-switch + deadline)? */
+/** Är eventets betting öppen globalt (master-switch + deadline)? Null deadline = ingen tidsgräns. */
 export function isGloballyOpen(event: EventRow, now: number = Date.now()): boolean {
-  return event.bettingOpen && now < event.bettingDeadline.getTime();
+  if (!event.bettingOpen) return false;
+  if (!event.bettingDeadline) return true;
+  return now < event.bettingDeadline.getTime();
 }
 
 /**

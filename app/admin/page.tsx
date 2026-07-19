@@ -55,12 +55,12 @@ export default async function AdminOverviewPage() {
       options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-    { one: event.teamOne, two: event.teamTwo },
+    { one: event.teamOne ?? "", two: event.teamTwo ?? "" },
   );
   const viewById = new Map(views.map((v) => [v.id, v]));
   const nameById = new Map(participants.map((p) => [p.id, p.name]));
 
-  const deadlinePassed = Date.now() > event.bettingDeadline.getTime();
+  const deadlinePassed = event.bettingDeadline ? Date.now() > event.bettingDeadline.getTime() : false;
   const activeGames = games.filter((g) => g.active).sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
@@ -114,7 +114,7 @@ export default async function AdminOverviewPage() {
               distribution={distribution}
               winners={gwinners}
               bettors={bettors}
-              teams={{ one: event.teamOne, two: event.teamTwo }}
+              teams={{ one: event.teamOne ?? "", two: event.teamTwo ?? "" }}
               isPackage={game.isJackpot}
             />
           );

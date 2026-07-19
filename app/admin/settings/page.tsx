@@ -36,10 +36,10 @@ export default async function AdminSettingsPage() {
   const values: SettingsFormValues = event
     ? {
         name: event.name,
-        teamOne: event.teamOne,
-        teamTwo: event.teamTwo,
-        matchStart: toDatetimeLocal(event.matchStart),
-        bettingDeadline: toDatetimeLocal(event.bettingDeadline),
+        teamOne: event.teamOne ?? "",
+        teamTwo: event.teamTwo ?? "",
+        matchStart: event.matchStart ? toDatetimeLocal(event.matchStart) : "",
+        bettingDeadline: event.bettingDeadline ? toDatetimeLocal(event.bettingDeadline) : "",
         currency: event.currency,
         defaultStake: event.defaultStake,
         jackpotStake: event.jackpotStake,
@@ -63,8 +63,8 @@ export default async function AdminSettingsPage() {
         <>
           <PlayersEditor
             eventId={event.id}
-            teamOneName={event.teamOne}
-            teamTwoName={event.teamTwo}
+            teamOneName={event.teamOne ?? ""}
+            teamTwoName={event.teamTwo ?? ""}
             initialTeam1={players.filter((p) => p.team === 1).map((p) => p.name)}
             initialTeam2={players.filter((p) => p.team === 2).map((p) => p.name)}
           />
