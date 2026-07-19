@@ -43,6 +43,9 @@ export default async function AdminEventsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  <Link href={`/admin/events/${e.id}`} className="text-sm font-medium text-grass hover:underline">
+                    Hantera
+                  </Link>
                   <Link
                     href={`/events/${e.slug}`}
                     className="text-sm text-muted hover:text-pitch"
