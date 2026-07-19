@@ -11,6 +11,7 @@ import {
 import { getParticipantToken } from "@/lib/auth";
 import { buildGameViews } from "@/lib/view";
 import { describeAnswer } from "@/lib/describe";
+import { SettlementList } from "@/components/settlement-list";
 import { computeStandings } from "@/lib/standings";
 import { formatMoney, cn } from "@/lib/utils";
 
@@ -116,6 +117,12 @@ async function Receipt({
           />
         </div>
       )}
+
+      <SettlementList
+        participants={standings.participants}
+        currency={event.currency}
+        viewerId={participantId}
+      />
 
       {betList.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted">
