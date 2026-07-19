@@ -4,7 +4,6 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
-  getActiveEvent,
   getEventById,
   getGames,
   participantNameExists,
@@ -92,15 +91,17 @@ export interface SubmitSelection {
   answer: unknown;
 }
 
-export async function submitBets(selections: SubmitSelection[]): Promise<ActionResult> {
+export async function submitBets(eventId: string, selections: SubmitSelection[]): Promise<ActionResult> {
   const token = await getParticipantToken();
   if (!token) return { ok: false, error: "Du är inte inloggad som deltagare." };
   const participant = await getParticipantByToken(token);
   if (!participant) return { ok: false, error: "Din deltagarsession är ogiltig." };
 
-  const event = await getActiveEvent();
-  if (!event || event.id !== participant.eventId) {
-    return { ok: false, error: "Eventet är inte aktivt." };
+  const event = await getEventById(eventId);
+  if (!event) return { ok: false, error: "Eventet finns inte." };
+  // Deltagaren måste tillhöra just detta event (medlemskap via deltagar-token).
+  if (event.id !== participant.eventId) {
+    return { ok: false, error: "Du är inte deltagare i det här eventet." };
   }
   if (!isGloballyOpen(event)) {
     return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };

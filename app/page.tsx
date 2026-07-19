@@ -164,6 +164,7 @@ async function JoinedContent({
         </Card>
       ) : (
         <BettingBoard
+          eventId={event.id}
           currency={event.currency}
           teams={{ one: event.teamOne ?? "", two: event.teamTwo ?? "" }}
           views={editableViews}
