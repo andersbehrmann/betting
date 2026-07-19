@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Card, Badge } from "@/components/ui";
 import {
-  getActiveEvent,
+  getEventBySlug,
   getGames,
   getPlayers,
   getAllBets,
@@ -15,20 +16,25 @@ import { formatMoney, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeaderboardPage() {
-  const event = await getActiveEvent();
+export default async function LeaderboardPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const event = await getEventBySlug(slug);
+  if (!event || event.status === "draft") notFound();
 
   return (
     <>
       <SiteHeader
         right={
-          <Link href="/" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+          >
             Till spelen
           </Link>
         }
       />
       <main className="mx-auto max-w-xl px-4 pt-4 pb-16">
-        {!event || !event.leaderboardVisible ? (
+        {!event.leaderboardVisible ? (
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Resultattavlan är inte öppen</p>
             <p className="mt-1 text-sm text-muted">Admin visar tavlan när det är dags.</p>
@@ -89,7 +95,7 @@ async function Board({ eventId, currency }: { eventId: string; currency: string 
 async function AllTips({
   event,
 }: {
-  event: NonNullable<Awaited<ReturnType<typeof getActiveEvent>>>;
+  event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>>;
 }) {
   const [games, players, bets, participants] = await Promise.all([
     getGames(event.id),
@@ -110,7 +116,7 @@ async function AllTips({
       options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-    { one: event.teamOne, two: event.teamTwo },
+    { one: event.teamOne ?? "", two: event.teamTwo ?? "" },
   );
   const viewById = new Map(views.map((v) => [v.id, v]));
   const gameById = new Map(games.map((g) => [g.id, g]));

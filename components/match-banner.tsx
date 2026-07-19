@@ -18,7 +18,9 @@ export function MatchBanner({ event, locked }: { event: EventRow; locked: boolea
       <div className="flex items-center justify-between border-t border-chalk/15 bg-pitch-deep/40 px-5 py-3 text-sm">
         <div>
           <div className="text-[0.7rem] uppercase tracking-wide text-chalk/60">Avspark</div>
-          <div className="font-medium">{formatStockholm(event.matchStart, "d MMM · HH:mm")}</div>
+          <div className="font-medium">
+            {event.matchStart ? formatStockholm(event.matchStart, "d MMM · HH:mm") : "–"}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-[0.7rem] uppercase tracking-wide text-chalk/60">
@@ -27,8 +29,10 @@ export function MatchBanner({ event, locked }: { event: EventRow; locked: boolea
           <div className="font-medium">
             {locked ? (
               <span className="text-gold">Stängd</span>
-            ) : (
+            ) : event.bettingDeadline ? (
               <Countdown isoDeadline={event.bettingDeadline.toISOString()} />
+            ) : (
+              <span className="text-gold">Öppet</span>
             )}
           </div>
         </div>

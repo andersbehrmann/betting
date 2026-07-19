@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Card, Badge, GameStatusBadge, PaymentBadge, StatPill } from "@/components/ui";
 import {
-  getActiveEvent,
+  getEventBySlug,
   getGames,
   getPlayers,
   getParticipantByToken,
@@ -18,21 +19,29 @@ import { formatMoney, cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function MyBetsPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ submitted?: string }>;
 }) {
+  const { slug } = await params;
   const sp = await searchParams;
-  const event = await getActiveEvent();
+  const event = await getEventBySlug(slug);
+  if (!event || event.status === "draft") notFound();
+
   const token = await getParticipantToken();
   const participant = token ? await getParticipantByToken(token) : null;
-  const joined = event && participant && participant.eventId === event.id;
+  const joined = participant && participant.eventId === event.id;
 
   return (
     <>
       <SiteHeader
         right={
-          <Link href="/" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+          >
             Till spelen
           </Link>
         }
@@ -42,12 +51,15 @@ export default async function MyBetsPage({
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Du har inga tips ännu</p>
             <p className="mt-1 text-sm text-muted">Gå till startsidan och häng med i tipsleken.</p>
-            <Link href="/" className="mt-3 inline-block font-medium text-grass hover:underline">
-              Till startsidan →
+            <Link
+              href={`/events/${event.slug}/play`}
+              className="mt-3 inline-block font-medium text-grass hover:underline"
+            >
+              Till tipsningen →
             </Link>
           </Card>
         ) : (
-          <Receipt event={event!} participantId={participant!.id} justSubmitted={sp.submitted === "1"} />
+          <Receipt event={event} participantId={participant!.id} justSubmitted={sp.submitted === "1"} />
         )}
       </main>
     </>
@@ -59,7 +71,7 @@ async function Receipt({
   participantId,
   justSubmitted,
 }: {
-  event: NonNullable<Awaited<ReturnType<typeof getActiveEvent>>>;
+  event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>>;
   participantId: string;
   justSubmitted: boolean;
 }) {
@@ -82,7 +94,7 @@ async function Receipt({
       options: g.options,
     })),
     players.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-    { one: event.teamOne, two: event.teamTwo },
+    { one: event.teamOne ?? "", two: event.teamTwo ?? "" },
   );
   const viewById = new Map(views.map((v) => [v.id, v]));
   const gameById = new Map(games.map((g) => [g.id, g]));
@@ -127,7 +139,10 @@ async function Receipt({
       {betList.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted">
           Du har inte valt några spel ännu.
-          <Link href="/" className="mt-2 block font-medium text-grass hover:underline">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="mt-2 block font-medium text-grass hover:underline"
+          >
             Lägg dina tips →
           </Link>
         </Card>

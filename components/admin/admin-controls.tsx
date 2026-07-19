@@ -48,11 +48,13 @@ function Toggle({
 }
 
 export function AdminControls({
+  eventId,
   bettingOpen,
   deadlinePassed,
   leaderboardVisible,
   betsPublic,
 }: {
+  eventId: string;
   bettingOpen: boolean;
   deadlinePassed: boolean;
   leaderboardVisible: boolean;
@@ -67,15 +69,15 @@ export function AdminControls({
         hint={deadlinePassed ? "Deadline har passerat – tips är låsta oavsett." : "Stäng för att låsa tips tidigare."}
         on={bettingOpen && !deadlinePassed}
         disabled={isPending || deadlinePassed}
-        onChange={(v) => startTransition(() => void setBettingOpen(v))}
+        onChange={(v) => startTransition(() => void setBettingOpen(eventId, v))}
       />
       <div className="border-t border-line/60" />
       <Toggle
         label="Visa resultattavla"
-        hint="Gör /leaderboard synlig för deltagarna."
+        hint="Gör resultattavlan synlig för deltagarna."
         on={leaderboardVisible}
         disabled={isPending}
-        onChange={(v) => startTransition(() => void toggleEventFlag("leaderboard_visible", v))}
+        onChange={(v) => startTransition(() => void toggleEventFlag(eventId, "leaderboard_visible", v))}
       />
       <div className="border-t border-line/60" />
       <Toggle
@@ -83,7 +85,7 @@ export function AdminControls({
         hint="Låt deltagarna se varandras tips efter spelstopp."
         on={betsPublic}
         disabled={isPending}
-        onChange={(v) => startTransition(() => void toggleEventFlag("bets_public", v))}
+        onChange={(v) => startTransition(() => void toggleEventFlag(eventId, "bets_public", v))}
       />
     </Card>
   );

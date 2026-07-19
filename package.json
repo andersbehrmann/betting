@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3007",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
-    "db:reset": "tsx db/migrate.ts --reset && tsx db/seed.ts"
+    "db:reset": "tsx db/migrate.ts --reset && tsx db/seed.ts",
+    "bootstrap-admin": "tsx db/bootstrap-admin.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

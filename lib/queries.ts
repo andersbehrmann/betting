@@ -11,6 +11,7 @@ import type {
   GameWinnerRow,
   PaymentStatus,
   GameStatus,
+  UserRow,
 } from "./types";
 import type { Answer, GameResult } from "./scoring/types";
 
@@ -23,10 +24,16 @@ function mapEvent(r: any): EventRow {
     id: r.id,
     name: r.name,
     slug: r.slug,
-    teamOne: r.team_one,
-    teamTwo: r.team_two,
-    matchStart: toDate(r.match_start),
-    bettingDeadline: toDate(r.betting_deadline),
+    eventType: r.event_type,
+    status: r.status,
+    joinFeeCents: r.join_fee_cents,
+    description: r.description ?? null,
+    coverImageUrl: r.cover_image_url ?? null,
+    createdBy: r.created_by ?? null,
+    teamOne: r.team_one ?? null,
+    teamTwo: r.team_two ?? null,
+    matchStart: r.match_start ? toDate(r.match_start) : null,
+    bettingDeadline: r.betting_deadline ? toDate(r.betting_deadline) : null,
     bettingOpen: r.betting_open,
     currency: r.currency,
     defaultStake: num(r.default_stake),
@@ -49,9 +56,11 @@ function mapParticipant(r: any): ParticipantRow {
   return {
     id: r.id,
     eventId: r.event_id,
+    userId: r.user_id ?? null,
     name: r.name,
-    accessToken: r.access_token,
+    accessToken: r.access_token ?? null,
     paymentStatus: r.payment_status,
+    joinFeeStatus: r.join_fee_status ?? "none",
     adminNote: r.admin_note,
   };
 }
@@ -98,23 +107,68 @@ function mapWinner(r: any): GameWinnerRow {
 
 // --- Events ---
 
-/** Aktivt event (MVP: senast skapade). */
-export async function getActiveEvent(): Promise<EventRow | null> {
-  const rows = await sql`SELECT * FROM events ORDER BY created_at DESC LIMIT 1`;
-  return rows[0] ? mapEvent(rows[0]) : null;
-}
-
 export async function getEventById(id: string): Promise<EventRow | null> {
   const rows = await sql`SELECT * FROM events WHERE id = ${id}`;
   return rows[0] ? mapEvent(rows[0]) : null;
 }
 
+/** Event via slug – för /events/[slug]. */
+export async function getEventBySlug(slug: string): Promise<EventRow | null> {
+  const rows = await sql`SELECT * FROM events WHERE slug = ${slug}`;
+  return rows[0] ? mapEvent(rows[0]) : null;
+}
+
+/** Publikt bläddringsbara event (ej draft), nyast först. */
+export async function listBrowsableEvents(): Promise<EventRow[]> {
+  const rows = await sql`
+    SELECT * FROM events WHERE status IN ('open', 'closed') ORDER BY created_at DESC`;
+  return rows.map(mapEvent);
+}
+
+/** Alla event (admin), nyast först. */
+export async function listAllEvents(): Promise<EventRow[]> {
+  const rows = await sql`SELECT * FROM events ORDER BY created_at DESC`;
+  return rows.map(mapEvent);
+}
+
+export interface PlatformEventInput {
+  name: string;
+  slug: string;
+  eventType: "betting" | "points";
+  joinFeeCents: number;
+  currency: string;
+  description: string | null;
+  status: "draft" | "open" | "closed";
+  createdBy: string | null;
+}
+
+/** Skapar ett generiskt plattforms-event (utan fotbollsfält/standardspel). */
+export async function createPlatformEvent(input: PlatformEventInput): Promise<string> {
+  const rows = await sql`
+    INSERT INTO events
+      (name, slug, event_type, join_fee_cents, currency, description, status, created_by)
+    VALUES
+      (${input.name}, ${input.slug}, ${input.eventType}, ${input.joinFeeCents},
+       ${input.currency}, ${input.description}, ${input.status}, ${input.createdBy})
+    RETURNING id`;
+  return rows[0].id as string;
+}
+
+export async function setEventStatus(
+  eventId: string,
+  status: "draft" | "open" | "closed",
+): Promise<void> {
+  await sql`UPDATE events SET status = ${status} WHERE id = ${eventId}`;
+}
+
+// --- Fotbolls-event-inställningar (legacy match-form) ---
+
 export interface EventSettingsInput {
   name: string;
-  teamOne: string;
-  teamTwo: string;
-  matchStart: Date;
-  bettingDeadline: Date;
+  teamOne: string | null;
+  teamTwo: string | null;
+  matchStart: Date | null;
+  bettingDeadline: Date | null;
   currency: string;
   defaultStake: number;
   jackpotStake: number;
@@ -131,8 +185,8 @@ export async function updateEventSettings(id: string, s: EventSettingsInput): Pr
       name = ${s.name},
       team_one = ${s.teamOne},
       team_two = ${s.teamTwo},
-      match_start = ${s.matchStart.toISOString()},
-      betting_deadline = ${s.bettingDeadline.toISOString()},
+      match_start = ${s.matchStart ? s.matchStart.toISOString() : null},
+      betting_deadline = ${s.bettingDeadline ? s.bettingDeadline.toISOString() : null},
       currency = ${s.currency},
       default_stake = ${s.defaultStake},
       jackpot_stake = ${s.jackpotStake},
@@ -142,22 +196,6 @@ export async function updateEventSettings(id: string, s: EventSettingsInput): Pr
       closest_result_mode = ${s.closestResultMode},
       package_tiebreak_exact = ${s.packageTiebreakExact}
     WHERE id = ${id}`;
-}
-
-export async function createEvent(input: EventSettingsInput & { slug: string }): Promise<string> {
-  const rows = await sql`
-    INSERT INTO events
-      (name, slug, team_one, team_two, match_start, betting_deadline, currency,
-       default_stake, jackpot_stake, star_player_name, star_listen_target,
-       count_staff_cards, closest_result_mode, package_tiebreak_exact)
-    VALUES
-      (${input.name}, ${input.slug}, ${input.teamOne}, ${input.teamTwo},
-       ${input.matchStart.toISOString()}, ${input.bettingDeadline.toISOString()},
-       ${input.currency}, ${input.defaultStake}, ${input.jackpotStake},
-       ${input.starPlayerName}, ${input.starListenTarget}, ${input.countStaffCards},
-       ${input.closestResultMode}, ${input.packageTiebreakExact})
-    RETURNING id`;
-  return rows[0].id as string;
 }
 
 export async function setBettingOpen(eventId: string, open: boolean): Promise<void> {
@@ -231,6 +269,39 @@ export async function setPaymentStatus(
 
 export async function setAdminNote(participantId: string, note: string | null): Promise<void> {
   await sql`UPDATE participants SET admin_note = ${note} WHERE id = ${participantId}`;
+}
+
+// --- Medlemskap (kontobaserat: participant kopplad till user_id) ---
+
+/** Användarens medlemskap i ett event (eller null). */
+export async function getMembership(
+  eventId: string,
+  userId: string,
+): Promise<ParticipantRow | null> {
+  const rows = await sql`
+    SELECT * FROM participants WHERE event_id = ${eventId} AND user_id = ${userId}`;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+/** Skapar ett medlemskap för en inloggad användare. joinFeeStatus: 'none' för gratis, 'pending' inför Stripe. */
+export async function createMembership(
+  eventId: string,
+  userId: string,
+  name: string,
+  joinFeeStatus: "none" | "pending",
+): Promise<ParticipantRow> {
+  const rows = await sql`
+    INSERT INTO participants (event_id, user_id, name, join_fee_status)
+    VALUES (${eventId}, ${userId}, ${name}, ${joinFeeStatus})
+    RETURNING *`;
+  return mapParticipant(rows[0]);
+}
+
+export async function setJoinFeeStatus(
+  participantId: string,
+  status: "none" | "pending" | "paid" | "refunded",
+): Promise<void> {
+  await sql`UPDATE participants SET join_fee_status = ${status} WHERE id = ${participantId}`;
 }
 
 // --- Games ---
@@ -409,4 +480,114 @@ export async function getAuditLog(eventId: string, limit = 100): Promise<AuditRo
     detail: r.detail,
     createdAt: toDate(r.created_at),
   }));
+}
+
+// --- Users / Sessions / Auth ---
+// UserRow är en DTO utan password_hash – hashen lämnar aldrig detta lager annat än
+// via getUserAuthByEmail (endast för lösenordsverifiering vid inloggning).
+
+function mapUser(r: any): UserRow {
+  return {
+    id: r.id,
+    name: r.name,
+    username: r.username,
+    email: r.email,
+    isAdmin: r.is_admin,
+  };
+}
+
+export interface NewUserInput {
+  name: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  isAdmin?: boolean;
+}
+
+export async function createUser(input: NewUserInput): Promise<UserRow> {
+  const rows = await sql`
+    INSERT INTO users (name, username, email, password_hash, is_admin)
+    VALUES (${input.name}, ${input.username}, ${input.email}, ${input.passwordHash}, ${input.isAdmin ?? false})
+    RETURNING *`;
+  return mapUser(rows[0]);
+}
+
+export async function getUserById(id: string): Promise<UserRow | null> {
+  const rows = await sql`SELECT * FROM users WHERE id = ${id}`;
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
+/** För inloggning: returnerar hashen tillsammans med grunddata (annars aldrig exponerad). */
+export async function getUserAuthByEmail(
+  email: string,
+): Promise<{ user: UserRow; passwordHash: string } | null> {
+  const rows = await sql`SELECT * FROM users WHERE lower(email) = lower(${email})`;
+  if (!rows[0]) return null;
+  return { user: mapUser(rows[0]), passwordHash: rows[0].password_hash as string };
+}
+
+export async function getUserIdByEmail(email: string): Promise<string | null> {
+  const rows = await sql`SELECT id FROM users WHERE lower(email) = lower(${email})`;
+  return rows[0] ? (rows[0].id as string) : null;
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  // Byt lösenord OCH revokera alla sessioner (i en transaktion).
+  await sql.transaction([
+    sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = now() WHERE id = ${userId}`,
+    sql`DELETE FROM sessions WHERE user_id = ${userId}`,
+  ]);
+}
+
+/** Slår upp en giltig (ej utgången) session och dess användare via token-hash. */
+export async function getUserBySessionTokenHash(tokenHash: string): Promise<UserRow | null> {
+  const rows = await sql`
+    SELECT u.* FROM sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.token_hash = ${tokenHash} AND s.expires_at > now()`;
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
+export async function createSession(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+  userAgent: string | null,
+): Promise<void> {
+  await sql`
+    INSERT INTO sessions (user_id, token_hash, expires_at, user_agent)
+    VALUES (${userId}, ${tokenHash}, ${expiresAt.toISOString()}, ${userAgent})`;
+}
+
+export async function deleteSessionByTokenHash(tokenHash: string): Promise<void> {
+  await sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;
+}
+
+// --- Lösenordsåterställning ---
+
+export async function createPasswordReset(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<void> {
+  await sql`
+    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+    VALUES (${userId}, ${tokenHash}, ${expiresAt.toISOString()})`;
+}
+
+export async function getPasswordReset(
+  tokenHash: string,
+): Promise<{ id: string; userId: string; expiresAt: Date; usedAt: Date | null } | null> {
+  const rows = await sql`SELECT * FROM password_reset_tokens WHERE token_hash = ${tokenHash}`;
+  if (!rows[0]) return null;
+  return {
+    id: rows[0].id,
+    userId: rows[0].user_id,
+    expiresAt: toDate(rows[0].expires_at),
+    usedAt: rows[0].used_at ? toDate(rows[0].used_at) : null,
+  };
+}
+
+export async function markPasswordResetUsed(id: string): Promise<void> {
+  await sql`UPDATE password_reset_tokens SET used_at = now() WHERE id = ${id}`;
 }

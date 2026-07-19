@@ -16,6 +16,7 @@ import type { GameView } from "@/lib/view";
 import type { GameStatus } from "@/lib/types";
 
 interface Props {
+  eventId: string;
   view: GameView;
   status: GameStatus;
   bettingOpen: boolean;
@@ -31,7 +32,7 @@ interface Props {
 }
 
 export function GameAdminCard(props: Props) {
-  const { view, status, bettingOpen, result, betCount, pot, currency, distribution, winners, bettors, teams, isPackage } = props;
+  const { eventId, view, status, bettingOpen, result, betCount, pot, currency, distribution, winners, bettors, teams, isPackage } = props;
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [facit, setFacit] = useState<unknown>(result ?? undefined);
@@ -122,7 +123,7 @@ export function GameAdminCard(props: Props) {
               size="sm"
               variant="gold"
               disabled={isPending}
-              onClick={() => run(() => settlePackage())}
+              onClick={() => run(() => settlePackage(eventId))}
             >
               Bygg facit & räkna vinnare
             </Button>

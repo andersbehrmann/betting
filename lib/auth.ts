@@ -1,77 +1,132 @@
-// Auktorisering i app-lagret. Ingen riktig user-auth – admin via lösenord,
-// deltagare via access_token. All kontroll sker server-side.
+// Auktorisering i app-lagret. Riktiga konton: lösenord (scrypt) + DB-baserade sessions.
+// Admin = users.is_admin. Deltagar-token (access_token) behålls för legacy-eventet.
+// All kontroll sker server-side.
 
 import "server-only";
-import { cookies } from "next/headers";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { cache } from "react";
+import { cookies, headers } from "next/headers";
+import {
+  scrypt as scryptCb,
+  randomBytes,
+  timingSafeEqual,
+  createHash,
+  type ScryptOptions,
+} from "node:crypto";
+import {
+  getUserBySessionTokenHash,
+  createSession,
+  deleteSessionByTokenHash,
+} from "./queries";
+import type { UserRow } from "./types";
 
-const ADMIN_COOKIE = "admin_session";
+// node:crypto scrypt med options (promisify:s typer saknar denna overload).
+function scrypt(
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  options: ScryptOptions,
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCb(password, salt, keylen, options, (err, derivedKey) =>
+      err ? reject(err) : resolve(derivedKey as Buffer),
+    );
+  });
+}
+
+const SESSION_COOKIE = "session";
 const PARTICIPANT_COOKIE = "participant_token";
-const ADMIN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dagar
 
-function secret(): string {
-  const s = process.env.SESSION_SECRET;
-  if (!s) throw new Error("SESSION_SECRET saknas.");
-  return s;
+// --- Lösenordshashning (node:crypto scrypt, ingen extern dep) ---
+// Format: scrypt$N$r$p$saltBase64$hashBase64
+
+const SCRYPT_N = 16384;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+const SCRYPT_KEYLEN = 64;
+
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const derived = (await scrypt(password.normalize("NFKC"), salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+  })) as Buffer;
+  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt.toString("base64")}$${derived.toString("base64")}`;
 }
 
-function sign(payloadB64: string): string {
-  return createHmac("sha256", secret()).update(payloadB64).digest("hex");
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const parts = stored.split("$");
+  if (parts.length !== 6 || parts[0] !== "scrypt") return false;
+  const [, n, r, p, saltB64, hashB64] = parts;
+  const salt = Buffer.from(saltB64, "base64");
+  const expected = Buffer.from(hashB64, "base64");
+  const actual = (await scrypt(password.normalize("NFKC"), salt, expected.length, {
+    N: Number(n),
+    r: Number(r),
+    p: Number(p),
+  })) as Buffer;
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
 }
 
-function safeEqual(a: string, b: string): boolean {
-  const ba = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ba.length !== bb.length) return false;
-  return timingSafeEqual(ba, bb);
+// --- Session-tokens ---
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
-function makeAdminToken(): string {
-  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + ADMIN_TTL_MS })).toString("base64url");
-  return `${payload}.${sign(payload)}`;
-}
-
-function verifyAdminToken(token: string | undefined): boolean {
-  if (!token) return false;
-  const [payload, sig] = token.split(".");
-  if (!payload || !sig) return false;
-  if (!safeEqual(sig, sign(payload))) return false;
+/** Skapar en ny session för användaren och sätter sessionscookien. */
+export async function setUserSession(userId: string): Promise<void> {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  let ua: string | null = null;
   try {
-    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString());
-    return typeof exp === "number" && exp > Date.now();
+    ua = (await headers()).get("user-agent");
   } catch {
-    return false;
+    ua = null;
   }
-}
-
-/** Kontrollerar admin-lösenordet (timing-safe). */
-export function checkAdminPassword(input: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) throw new Error("ADMIN_PASSWORD saknas.");
-  return safeEqual(input, expected);
-}
-
-/** Sätter admin-sessionscookie efter lyckad inloggning. */
-export async function setAdminSession(): Promise<void> {
+  await createSession(userId, hashToken(token), expiresAt, ua);
   const jar = await cookies();
-  jar.set(ADMIN_COOKIE, makeAdminToken(), {
+  jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: ADMIN_TTL_MS / 1000,
+    expires: expiresAt,
   });
 }
 
-export async function clearAdminSession(): Promise<void> {
+/** Loggar ut: raderar sessionsraden och tömmer cookien. */
+export async function clearUserSession(): Promise<void> {
   const jar = await cookies();
-  jar.delete(ADMIN_COOKIE);
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (token) await deleteSessionByTokenHash(hashToken(token));
+  jar.delete(SESSION_COOKIE);
+}
+
+/**
+ * Aktuell inloggad användare (eller null). Memoiseras per render-pass med React cache
+ * så vi bara gör en session-uppslagning per request.
+ */
+export const getCurrentUser = cache(async (): Promise<UserRow | null> => {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return getUserBySessionTokenHash(hashToken(token));
+});
+
+/** Kastar om ingen är inloggad – använd i server actions som kräver konto. */
+export async function requireUser(): Promise<UserRow> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Ej inloggad.");
+  return user;
 }
 
 /** True om aktuell request har en giltig admin-session. */
 export async function isAdmin(): Promise<boolean> {
-  const jar = await cookies();
-  return verifyAdminToken(jar.get(ADMIN_COOKIE)?.value);
+  const user = await getCurrentUser();
+  return user?.isAdmin === true;
 }
 
 /** Kastar om inte admin – använd i admin-actions. */
@@ -79,7 +134,7 @@ export async function requireAdmin(): Promise<void> {
   if (!(await isAdmin())) throw new Error("Ej behörig (admin krävs).");
 }
 
-// --- Deltagare ---
+// --- Deltagare (legacy-token, behålls för det seedade fotbollseventet) ---
 
 export async function setParticipantToken(token: string): Promise<void> {
   const jar = await cookies();

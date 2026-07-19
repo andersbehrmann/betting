@@ -22,7 +22,13 @@ export interface SettingsFormValues {
   packageTiebreakExact: boolean;
 }
 
-export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; isNew: boolean }) {
+export function SettingsForm({
+  eventId,
+  initial,
+}: {
+  eventId: string;
+  initial: SettingsFormValues;
+}) {
   const router = useRouter();
   const [v, setV] = useState<SettingsFormValues>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +51,7 @@ export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; 
       starListenTarget: v.starListenTarget || null,
     };
     startTransition(async () => {
-      const res = await saveEventSettings(raw);
+      const res = await saveEventSettings(eventId, raw);
       if (!res.ok) {
         setError(res.error);
         return;
@@ -57,9 +63,7 @@ export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; 
 
   return (
     <Card className="p-5">
-      <h2 className="font-display text-lg font-bold text-pitch">
-        {isNew ? "Skapa kvällens match" : "Matchinställningar"}
-      </h2>
+      <h2 className="font-display text-lg font-bold text-pitch">Matchinställningar</h2>
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field label="Eventnamn">
           <Input value={v.name} onChange={(e) => set("name", e.target.value)} required />
@@ -132,7 +136,7 @@ export function SettingsForm({ initial, isNew }: { initial: SettingsFormValues; 
         {error && <p className="text-sm text-lose">{error}</p>}
         {saved && <p className="text-sm text-grass">✓ Sparat.</p>}
         <Button type="submit" size="lg" disabled={isPending}>
-          {isPending ? "Sparar…" : isNew ? "Skapa event & spel" : "Spara inställningar"}
+          {isPending ? "Sparar…" : "Spara inställningar"}
         </Button>
       </form>
     </Card>
