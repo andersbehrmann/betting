@@ -107,17 +107,6 @@ function mapWinner(r: any): GameWinnerRow {
 
 // --- Events ---
 
-/**
- * Aktivt "match-event" för de äldre fotbollssidorna (/, /my-bets, /leaderboard, /admin).
- * Returnerar senaste eventet MED lag (team_one), så att generiska plattforms-event
- * (utan lag) inte kapar de fotbollsspecifika vyerna. Nya event nås via /events/[slug].
- */
-export async function getActiveEvent(): Promise<EventRow | null> {
-  const rows = await sql`
-    SELECT * FROM events WHERE team_one IS NOT NULL ORDER BY created_at DESC LIMIT 1`;
-  return rows[0] ? mapEvent(rows[0]) : null;
-}
-
 export async function getEventById(id: string): Promise<EventRow | null> {
   const rows = await sql`SELECT * FROM events WHERE id = ${id}`;
   return rows[0] ? mapEvent(rows[0]) : null;

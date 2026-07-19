@@ -10,7 +10,6 @@ import {
   getGames,
   getGameById,
   updateEventSettings,
-  createEvent,
   createPlatformEvent,
   setEventStatus,
   setBettingOpen as qSetBettingOpen,
@@ -30,7 +29,6 @@ import {
 } from "@/lib/queries";
 import { recalcGame } from "@/lib/recalc";
 import { fromDatetimeLocal } from "@/lib/time";
-import { GAME_DEFINITIONS } from "@/lib/scoring/games";
 import { assemblePackageResult } from "@/lib/scoring/evaluate";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
 import type { GameResult, PackageResult, ScoreAnswer } from "@/lib/scoring/types";
@@ -44,12 +42,8 @@ async function guard(): Promise<Result | null> {
 }
 
 function revalidateAdmin() {
-  revalidatePath("/admin");
-  revalidatePath("/admin/settings");
-  revalidatePath("/admin/results");
-  revalidatePath("/");
-  revalidatePath("/my-bets");
-  revalidatePath("/leaderboard");
+  revalidatePath("/admin/events");
+  revalidatePath("/events");
 }
 
 // --- Auth ---
@@ -159,30 +153,6 @@ function toEventSettings(raw: z.infer<typeof settingsSchema>): EventSettingsInpu
     closestResultMode: raw.closestResultMode,
     packageTiebreakExact: raw.packageTiebreakExact,
   };
-}
-
-function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 50) || "event"
-  );
-}
-
-/** Skapar de 12 spelen + matchpaketet för ett nytt event. */
-async function createGamesForEvent(eventId: string, defaultStake: number, jackpotStake: number) {
-  // Utförs via queries – en enkel loop (körs bara vid event-skapande).
-  const { sql } = await import("@/lib/db");
-  for (const def of GAME_DEFINITIONS) {
-    await sql`
-      INSERT INTO games (event_id, game_key, title, description, stake, is_jackpot, active, sort_order, status)
-      VALUES (${eventId}, ${def.key}, ${def.title}, ${def.description ?? null},
-              ${def.isJackpot ? jackpotStake : defaultStake}, ${def.isJackpot}, true, ${def.sortOrder}, 'open')`;
-  }
 }
 
 export async function saveEventSettings(eventId: string, raw: SettingsInputRaw): Promise<Result> {

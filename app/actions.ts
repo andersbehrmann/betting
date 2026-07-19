@@ -50,7 +50,7 @@ export async function joinEvent(eventId: string, rawName: string): Promise<Actio
   const token = randomBytes(16).toString("hex");
   await createParticipant(eventId, name, token);
   await setParticipantToken(token);
-  revalidatePath("/");
+  revalidatePath("/events");
   return { ok: true };
 }
 
@@ -138,7 +138,6 @@ export async function submitBets(eventId: string, selections: SubmitSelection[])
     .map((b) => b.gameId);
 
   await saveBets(participant.id, validated, removedGameIds);
-  revalidatePath("/");
-  revalidatePath("/my-bets");
+  revalidatePath("/events");
   return { ok: true };
 }
