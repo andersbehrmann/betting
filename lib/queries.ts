@@ -11,6 +11,7 @@ import type {
   GameWinnerRow,
   PaymentStatus,
   GameStatus,
+  UserRow,
 } from "./types";
 import type { Answer, GameResult } from "./scoring/types";
 
@@ -409,4 +410,114 @@ export async function getAuditLog(eventId: string, limit = 100): Promise<AuditRo
     detail: r.detail,
     createdAt: toDate(r.created_at),
   }));
+}
+
+// --- Users / Sessions / Auth ---
+// UserRow är en DTO utan password_hash – hashen lämnar aldrig detta lager annat än
+// via getUserAuthByEmail (endast för lösenordsverifiering vid inloggning).
+
+function mapUser(r: any): UserRow {
+  return {
+    id: r.id,
+    name: r.name,
+    username: r.username,
+    email: r.email,
+    isAdmin: r.is_admin,
+  };
+}
+
+export interface NewUserInput {
+  name: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  isAdmin?: boolean;
+}
+
+export async function createUser(input: NewUserInput): Promise<UserRow> {
+  const rows = await sql`
+    INSERT INTO users (name, username, email, password_hash, is_admin)
+    VALUES (${input.name}, ${input.username}, ${input.email}, ${input.passwordHash}, ${input.isAdmin ?? false})
+    RETURNING *`;
+  return mapUser(rows[0]);
+}
+
+export async function getUserById(id: string): Promise<UserRow | null> {
+  const rows = await sql`SELECT * FROM users WHERE id = ${id}`;
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
+/** För inloggning: returnerar hashen tillsammans med grunddata (annars aldrig exponerad). */
+export async function getUserAuthByEmail(
+  email: string,
+): Promise<{ user: UserRow; passwordHash: string } | null> {
+  const rows = await sql`SELECT * FROM users WHERE lower(email) = lower(${email})`;
+  if (!rows[0]) return null;
+  return { user: mapUser(rows[0]), passwordHash: rows[0].password_hash as string };
+}
+
+export async function getUserIdByEmail(email: string): Promise<string | null> {
+  const rows = await sql`SELECT id FROM users WHERE lower(email) = lower(${email})`;
+  return rows[0] ? (rows[0].id as string) : null;
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  // Byt lösenord OCH revokera alla sessioner (i en transaktion).
+  await sql.transaction([
+    sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = now() WHERE id = ${userId}`,
+    sql`DELETE FROM sessions WHERE user_id = ${userId}`,
+  ]);
+}
+
+/** Slår upp en giltig (ej utgången) session och dess användare via token-hash. */
+export async function getUserBySessionTokenHash(tokenHash: string): Promise<UserRow | null> {
+  const rows = await sql`
+    SELECT u.* FROM sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.token_hash = ${tokenHash} AND s.expires_at > now()`;
+  return rows[0] ? mapUser(rows[0]) : null;
+}
+
+export async function createSession(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+  userAgent: string | null,
+): Promise<void> {
+  await sql`
+    INSERT INTO sessions (user_id, token_hash, expires_at, user_agent)
+    VALUES (${userId}, ${tokenHash}, ${expiresAt.toISOString()}, ${userAgent})`;
+}
+
+export async function deleteSessionByTokenHash(tokenHash: string): Promise<void> {
+  await sql`DELETE FROM sessions WHERE token_hash = ${tokenHash}`;
+}
+
+// --- Lösenordsåterställning ---
+
+export async function createPasswordReset(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<void> {
+  await sql`
+    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+    VALUES (${userId}, ${tokenHash}, ${expiresAt.toISOString()})`;
+}
+
+export async function getPasswordReset(
+  tokenHash: string,
+): Promise<{ id: string; userId: string; expiresAt: Date; usedAt: Date | null } | null> {
+  const rows = await sql`SELECT * FROM password_reset_tokens WHERE token_hash = ${tokenHash}`;
+  if (!rows[0]) return null;
+  return {
+    id: rows[0].id,
+    userId: rows[0].user_id,
+    expiresAt: toDate(rows[0].expires_at),
+    usedAt: rows[0].used_at ? toDate(rows[0].used_at) : null,
+  };
+}
+
+export async function markPasswordResetUsed(id: string): Promise<void> {
+  await sql`UPDATE password_reset_tokens SET used_at = now() WHERE id = ${id}`;
 }

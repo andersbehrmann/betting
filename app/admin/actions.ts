@@ -4,12 +4,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import {
-  checkAdminPassword,
-  setAdminSession,
-  clearAdminSession,
-  isAdmin,
-} from "@/lib/auth";
+import { clearUserSession, isAdmin } from "@/lib/auth";
 import {
   getActiveEvent,
   getGames,
@@ -56,18 +51,11 @@ function revalidateAdmin() {
 }
 
 // --- Auth ---
-
-export async function adminLogin(password: string): Promise<Result> {
-  if (!checkAdminPassword(password)) {
-    return { ok: false, error: "Fel lösenord." };
-  }
-  await setAdminSession();
-  return { ok: true };
-}
+// Inloggning sker nu via /login (konto + lösenord). Admin = users.is_admin.
 
 export async function adminLogout(): Promise<void> {
-  await clearAdminSession();
-  redirect("/admin/login");
+  await clearUserSession();
+  redirect("/");
 }
 
 // --- Event / inställningar ---

@@ -5,7 +5,8 @@
       "name": "betting-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "port": 3007,
+      "autoPort": true
     }
   ]
 }

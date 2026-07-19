@@ -5,6 +5,14 @@ import type { GameResult, Answer, ClosestResultMode, GameOption } from "./scorin
 export type PaymentStatus = "unpaid" | "paid" | "settled";
 export type GameStatus = "open" | "closed" | "awaiting_result" | "settled";
 
+export interface UserRow {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  isAdmin: boolean;
+}
+
 export interface EventRow {
   id: string;
   name: string;

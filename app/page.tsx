@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { MatchBanner } from "@/components/match-banner";
 import { JoinForm } from "@/components/participant/join-form";
 import { BettingBoard } from "@/components/participant/betting-board";
+import { AuthNav } from "@/components/auth/auth-nav";
 import { Card } from "@/components/ui";
 import {
   getActiveEvent,
@@ -34,6 +35,7 @@ export default async function HomePage() {
                 Ligan
               </Link>
             )}
+            <AuthNav />
           </>
         }
       />
