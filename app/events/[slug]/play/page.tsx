@@ -30,11 +30,17 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
       <SiteHeader
         right={
           <>
-            <Link href="/my-bets" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+            <Link
+              href={`/events/${event.slug}/my-bets`}
+              className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+            >
               Mina tips
             </Link>
             {event?.leaderboardVisible && (
-              <Link href="/leaderboard" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+              <Link
+                href={`/events/${event.slug}/leaderboard`}
+                className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+              >
                 Ligan
               </Link>
             )}
@@ -152,13 +158,17 @@ async function JoinedContent({
         <Card className="p-6 text-center">
           <p className="font-display text-lg text-pitch">Dina tips är låsta</p>
           <p className="mt-1 text-sm text-muted">Tipsstoppet har passerat.</p>
-          <Link href="/my-bets" className="mt-3 inline-block font-medium text-grass hover:underline">
+          <Link
+            href={`/events/${event.slug}/my-bets`}
+            className="mt-3 inline-block font-medium text-grass hover:underline"
+          >
             Se dina tips och resultat →
           </Link>
         </Card>
       ) : (
         <BettingBoard
           eventId={event.id}
+          eventSlug={event.slug}
           currency={event.currency}
           teams={{ one: event.teamOne ?? "", two: event.teamTwo ?? "" }}
           views={editableViews}

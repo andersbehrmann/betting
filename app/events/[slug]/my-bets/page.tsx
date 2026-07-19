@@ -37,7 +37,10 @@ export default async function MyBetsPage({
     <>
       <SiteHeader
         right={
-          <Link href="/" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+          >
             Till spelen
           </Link>
         }
@@ -47,8 +50,11 @@ export default async function MyBetsPage({
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Du har inga tips ännu</p>
             <p className="mt-1 text-sm text-muted">Gå till startsidan och häng med i tipsleken.</p>
-            <Link href="/" className="mt-3 inline-block font-medium text-grass hover:underline">
-              Till startsidan →
+            <Link
+              href={`/events/${event.slug}/play`}
+              className="mt-3 inline-block font-medium text-grass hover:underline"
+            >
+              Till tipsningen →
             </Link>
           </Card>
         ) : (
@@ -126,7 +132,10 @@ async function Receipt({
       {betList.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted">
           Du har inte valt några spel ännu.
-          <Link href="/" className="mt-2 block font-medium text-grass hover:underline">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="mt-2 block font-medium text-grass hover:underline"
+          >
             Lägg dina tips →
           </Link>
         </Card>

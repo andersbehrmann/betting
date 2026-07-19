@@ -19,6 +19,7 @@ interface LockedItem {
 
 interface Props {
   eventId: string;
+  eventSlug: string;
   currency: string;
   teams: { one: string; two: string };
   views: GameView[];
@@ -39,7 +40,7 @@ function answerComplete(view: GameView, answer: unknown): boolean {
   return Boolean((answer as { value?: string }).value);
 }
 
-export function BettingBoard({ eventId, currency, teams, views, initial, locked = [] }: Props) {
+export function BettingBoard({ eventId, eventSlug, currency, teams, views, initial, locked = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +136,7 @@ export function BettingBoard({ eventId, currency, teams, views, initial, locked 
         setError(res.error);
         return;
       }
-      router.push("/my-bets?submitted=1");
+      router.push(`/events/${eventSlug}/my-bets?submitted=1`);
       router.refresh();
     });
   }

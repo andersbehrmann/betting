@@ -21,7 +21,7 @@ export default async function EventDetailPage({
 
   const [user, participants] = await Promise.all([getCurrentUser(), getParticipants(event.id)]);
   const membership = user ? await getMembership(event.id, user.id) : null;
-  const isFootball = event.teamOne != null; // legacy match-event → spela på "/"
+  const isFootball = event.teamOne != null; // legacy match-event → spela på /events/[slug]/play
 
   return (
     <>
@@ -86,7 +86,10 @@ export default async function EventDetailPage({
                 )}
               </div>
               {isFootball ? (
-                <Link href="/" className="mt-4 inline-block font-medium text-grass hover:underline">
+                <Link
+                  href={`/events/${event.slug}/play`}
+                  className="mt-4 inline-block font-medium text-grass hover:underline"
+                >
                   Till tipsningen →
                 </Link>
               ) : (

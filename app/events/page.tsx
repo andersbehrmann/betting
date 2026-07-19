@@ -15,7 +15,7 @@ export default async function EventsPage() {
       <SiteHeader right={<AuthNav />} />
 
       <main className="mx-auto max-w-xl px-4 pb-16 pt-6">
-        <h2 className="mb-3 font-display text-lg font-bold text-pitch">Aktuella event</h2>
+        <h1 className="mb-3 font-display text-xl font-bold text-pitch">Aktuella event</h1>
 
         {events.length === 0 ? (
           <Card className="p-6 text-center">

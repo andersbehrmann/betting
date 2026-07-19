@@ -14,6 +14,10 @@ export default function LandingPage() {
           En plattform för att tippa och tävla kring event – från VM-finaler till Crossfit Games.
           Skapa ett gratis konto, anslut dig till ett event och klättra på leaderboarden.
         </p>
+        <p className="mt-3 text-muted">
+          Betting-event bygger på att deltagarna gör upp sinsemellan – vi håller koll på tips,
+          resultat och ställning. Poäng-event ger poäng för rätt svar.
+        </p>
         <Link
           href="/events"
           className="mt-6 inline-block rounded-[var(--radius-pill)] bg-grass px-6 py-3 font-medium text-chalk hover:bg-grass-bright"

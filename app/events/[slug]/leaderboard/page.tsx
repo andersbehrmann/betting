@@ -25,7 +25,10 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ sl
     <>
       <SiteHeader
         right={
-          <Link href="/" className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch">
+          <Link
+            href={`/events/${event.slug}/play`}
+            className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+          >
             Till spelen
           </Link>
         }
