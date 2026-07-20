@@ -48,7 +48,12 @@ export default async function AdminResultsPage({
         <p className="text-sm text-muted">Insats, vinst, netto och betalningsstatus per deltagare.</p>
       </div>
 
-      <ResultsTable eventId={event.id} participants={ranked} currency={event.currency} />
+      <ResultsTable
+        eventId={event.id}
+        participants={ranked}
+        currency={event.currency}
+        creditLabel={standings.rolledOverToJackpot > 0 ? "Från jackpot" : "Återbetalt"}
+      />
 
       <SettlementList participants={standings.participants} currency={event.currency} />
 

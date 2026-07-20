@@ -120,10 +120,19 @@ async function Receipt({
         {me && <PaymentBadge status={me.paymentStatus} />}
       </div>
 
+      {/* Fyra rutor när en pott ingen vann bidragit – annars ser nettot ut som
+          ett räknefel, eftersom vinst − insats då inte går ihop. */}
       {me && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className={cn("grid gap-2", me.unwonCredit > 0 ? "grid-cols-2" : "grid-cols-3")}>
           <StatPill label="Insats" value={formatMoney(me.totalStake, event.currency)} />
           <StatPill label="Vinst" value={formatMoney(me.totalWinnings, event.currency)} tone="green" />
+          {me.unwonCredit > 0 && (
+            <StatPill
+              label={standings.rolledOverToJackpot > 0 ? "Från jackpot" : "Återbetalt"}
+              value={formatMoney(me.unwonCredit, event.currency)}
+              tone="green"
+            />
+          )}
           <StatPill
             label="Netto"
             value={formatMoney(me.net, event.currency)}
