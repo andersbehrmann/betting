@@ -17,7 +17,22 @@ export function SettlementList({
   /** Om satt: visa bara rader som rör denna deltagare (deltagarläge). */
   viewerId?: string;
 }) {
-  const transfers = computeSettlement(participants);
+  // computeSettlement vägrar räkna på en obalanserad sammanställning – hellre en
+  // synlig varning än en uträkning som tyst pekar ut fel person som vinnare.
+  let transfers;
+  try {
+    transfers = computeSettlement(participants);
+  } catch (err) {
+    if (viewerId) return null;
+    return (
+      <Card className="p-4">
+        <h2 className="font-display text-lg font-bold text-lose">Sammanräkningen går inte ihop</h2>
+        <p className="mt-1 text-sm text-muted">
+          {err instanceof Error ? err.message : "Okänt fel."}
+        </p>
+      </Card>
+    );
+  }
 
   // Deltagarläge: bara mina egna rader.
   if (viewerId) {

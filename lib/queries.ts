@@ -1,6 +1,7 @@
 // Typade databasfrågor. Endast server-side (importerar lib/db).
 
 import "server-only";
+import { randomBytes } from "node:crypto";
 import { sql, num, toDate } from "./db";
 import type {
   EventRow,
@@ -15,6 +16,7 @@ import type {
   ProposalRow,
   ProposalStatus,
   FriendLeaderboardRow,
+  NoWinnerPolicy,
 } from "./types";
 import type { Answer, GameResult } from "./scoring/types";
 
@@ -48,6 +50,7 @@ function mapEvent(r: any): EventRow {
     packageTiebreakExact: r.package_tiebreak_exact,
     leaderboardVisible: r.leaderboard_visible,
     betsPublic: r.bets_public,
+    noWinnerPolicy: r.no_winner_policy ?? "refund",
   };
 }
 
@@ -61,7 +64,6 @@ function mapParticipant(r: any): ParticipantRow {
     eventId: r.event_id,
     userId: r.user_id ?? null,
     name: r.name,
-    accessToken: r.access_token ?? null,
     paymentStatus: r.payment_status,
     joinFeeStatus: r.join_fee_status ?? "none",
     adminNote: r.admin_note,
@@ -181,6 +183,7 @@ export interface EventSettingsInput {
   countStaffCards: boolean;
   closestResultMode: "nearest" | "no_winner";
   packageTiebreakExact: boolean;
+  noWinnerPolicy: NoWinnerPolicy;
 }
 
 export async function updateEventSettings(id: string, s: EventSettingsInput): Promise<void> {
@@ -198,7 +201,8 @@ export async function updateEventSettings(id: string, s: EventSettingsInput): Pr
       star_listen_target = ${s.starListenTarget},
       count_staff_cards = ${s.countStaffCards},
       closest_result_mode = ${s.closestResultMode},
-      package_tiebreak_exact = ${s.packageTiebreakExact}
+      package_tiebreak_exact = ${s.packageTiebreakExact},
+      no_winner_policy = ${s.noWinnerPolicy}
     WHERE id = ${id}`;
 }
 
@@ -244,6 +248,33 @@ export async function getParticipants(eventId: string): Promise<ParticipantRow[]
 export async function getParticipantByToken(token: string): Promise<ParticipantRow | null> {
   const rows = await sql`SELECT * FROM participants WHERE access_token = ${token}`;
   return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+/**
+ * Deltagarens access_token, skapad vid behov.
+ *
+ * Kontobaserade medlemskap fick tidigare ingen token alls, vilket betydde att en
+ * tappad session låste ut dig från din egen deltagarrad – det fanns ingen väg
+ * tillbaka. Nu får alla deltagare en token, men den lämnar aldrig servern annat
+ * än som värde i deltagarens egen httpOnly-cookie. Returnera den ALDRIG till en
+ * klientkomponent och lägg den aldrig i ParticipantRow.
+ */
+export async function getOrCreateParticipantToken(participantId: string): Promise<string> {
+  const existing = await sql`SELECT access_token FROM participants WHERE id = ${participantId}`;
+  if (!existing[0]) throw new Error("Deltagare saknas.");
+  if (existing[0].access_token) return existing[0].access_token as string;
+
+  const token = randomBytes(16).toString("hex");
+  // Villkoret på IS NULL gör skrivningen säker mot två samtidiga requests:
+  // förloraren får noll rader tillbaka och läser om vinnarens token nedan.
+  const updated = await sql`
+    UPDATE participants SET access_token = ${token}
+    WHERE id = ${participantId} AND access_token IS NULL
+    RETURNING access_token`;
+  if (updated[0]) return updated[0].access_token as string;
+
+  const raced = await sql`SELECT access_token FROM participants WHERE id = ${participantId}`;
+  return raced[0].access_token as string;
 }
 
 export async function participantNameExists(eventId: string, name: string): Promise<boolean> {

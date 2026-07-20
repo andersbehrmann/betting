@@ -1,6 +1,9 @@
 // App-nivå datatyper (mappade från DB-rader – numbers/booleans/Date normaliserade).
 
 import type { GameResult, Answer, ClosestResultMode, GameOption } from "./scoring/types";
+import type { NoWinnerPolicy } from "./scoring/unwon";
+
+export type { NoWinnerPolicy };
 
 export type PaymentStatus = "unpaid" | "paid" | "settled";
 // "draft" = skapat från ett godkänt förslag, men ännu inte publicerat av admin.
@@ -44,6 +47,8 @@ export interface EventRow {
   packageTiebreakExact: boolean;
   leaderboardVisible: boolean;
   betsPublic: boolean;
+  /** Vad som händer med potten i spel utan vinnare. */
+  noWinnerPolicy: NoWinnerPolicy;
 }
 
 export interface PlayerRow {
@@ -59,7 +64,10 @@ export interface ParticipantRow {
   eventId: string;
   userId: string | null;
   name: string;
-  accessToken: string | null;
+  // access_token ligger medvetet INTE här. Den är en bärarnyckel som ger
+  // tillträde till deltagarens tips, och ParticipantRow skickas till
+  // serverkomponenter som lätt råkar skicka vidare den till klienten. Behöver du
+  // token: använd getOrCreateParticipantToken() och sätt den direkt i cookien.
   paymentStatus: PaymentStatus;
   joinFeeStatus: JoinFeeStatus;
   adminNote: string | null;

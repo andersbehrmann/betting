@@ -13,7 +13,11 @@ import {
   getAdminUsers,
 } from "@/lib/queries";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
-import { resolveParticipant, hasPaidAccess } from "@/lib/participants";
+import {
+  resolveParticipant,
+  hasPaidAccess,
+  rememberParticipantOnDevice,
+} from "@/lib/participants";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 
@@ -38,14 +42,19 @@ export async function joinPlatformEvent(eventId: string): Promise<Result> {
   if (event.status !== "open") return { ok: false, error: "Eventet tar inte emot nya deltagare." };
 
   const existing = await getMembership(eventId, user.id);
-  if (existing) return { ok: true };
+  if (existing) {
+    await rememberParticipantOnDevice(existing.id);
+    return { ok: true };
+  }
 
   if (event.joinFeeCents > 0) {
     return { ok: false, error: "Det här eventet kräver betalning." };
   }
 
   const name = await uniqueDisplayName(eventId, user.name, user.username);
-  await createMembership(eventId, user.id, name, "none");
+  const membership = await createMembership(eventId, user.id, name, "none");
+  // Reserv om sessionen försvinner – annars är man utelåst från sitt medlemskap.
+  await rememberParticipantOnDevice(membership.id);
   revalidatePath(`/events/${event.slug}`);
   return { ok: true };
 }

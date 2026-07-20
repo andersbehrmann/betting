@@ -17,15 +17,31 @@ export interface Transfer {
 
 /**
  * Girig min-cash-flow: matcha största skuld mot största fordran. Ger som mest
- * n−1 överföringar. Nettona heltalsavrundas och summan tvingas till exakt 0
- * (residualen läggs på posten med störst magnitud) så allt går jämnt ut.
+ * n−1 överföringar. Nettona heltalsavrundas och summan tvingas till exakt 0 så
+ * allt går jämnt ut.
+ *
+ * Kastar om nettona inte redan summerar till ~0. En riktig obalans betyder att
+ * pengar samlats in utan att bokföras (t.ex. en pott utan vinnare) och det får
+ * aldrig döljas genom att skyffla mellanskillnaden till en enskild spelare –
+ * det pekar ut fel person som vinnare. Se lib/scoring/unwon.ts.
  */
 export function computeSettlement(participants: SettlementInput[]): Transfer[] {
   // 1. Heltalsavrunda nettona.
   const rounded = participants.map((p) => ({ id: p.id, name: p.name, net: Math.round(p.net) }));
 
-  // 2. Tvinga summan till exakt 0 genom att justera posten med störst magnitud.
+  // 2. Avvisa allt som är större än avrundningsbrus. Varje netto kan flytta sig
+  //    max ±0,5 kr vid heltalsavrundning, plus någon ensam öre från lagrade
+  //    utbetalningar med decimaler.
   const residual = rounded.reduce((s, p) => s + p.net, 0);
+  const tolerance = Math.ceil(rounded.length / 2) + 1;
+  if (Math.abs(residual) > tolerance) {
+    throw new Error(
+      `Sammanräkningen går inte ihop: nettona summerar till ${residual} kr i stället för 0. ` +
+        `Det beror på pengar som samlats in men inte delats ut – kontrollera spel utan vinnare.`,
+    );
+  }
+
+  // 3. Jämna ut den kvarvarande öresavrundningen på posten med störst magnitud.
   if (residual !== 0 && rounded.length > 0) {
     const target = [...rounded].sort(
       (a, b) => Math.abs(b.net) - Math.abs(a.net) || (a.id < b.id ? -1 : 1),
