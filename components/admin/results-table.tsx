@@ -72,10 +72,13 @@ export function ResultsTable({
   eventId,
   participants,
   currency,
+  /** Etikett för potter ingen vann: "Återbetalt" eller "Från jackpot". */
+  creditLabel,
 }: {
   eventId: string;
   participants: ParticipantStanding[];
   currency: string;
+  creditLabel: string;
 }) {
   if (participants.length === 0) {
     return <Card className="p-6 text-center text-sm text-muted">Inga deltagare ännu.</Card>;
@@ -85,9 +88,10 @@ export function ResultsTable({
     (acc, p) => ({
       stake: acc.stake + p.totalStake,
       winnings: acc.winnings + p.totalWinnings,
+      credit: acc.credit + p.unwonCredit,
       net: acc.net + p.net,
     }),
-    { stake: 0, winnings: 0, net: 0 },
+    { stake: 0, winnings: 0, credit: 0, net: 0 },
   );
 
   return (
@@ -95,16 +99,30 @@ export function ResultsTable({
       {participants.map((p) => (
         <div key={p.id} className="px-4 py-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-ink">{p.name}</span>
+            <span className="flex items-center gap-2">
+              <span className="font-medium text-ink">{p.name}</span>
+              {p.betCount === 0 && (
+                <span className="rounded-[var(--radius-pill)] bg-cream-deep px-2 py-0.5 text-xs text-muted">
+                  har inte spelat
+                </span>
+              )}
+            </span>
             <PaymentControl eventId={eventId} id={p.id} status={p.paymentStatus} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="text-muted">
-              Insats: <span className="text-ink">{formatMoney(p.totalStake, currency)}</span>
+              Insats: <span className="text-ink">−{formatMoney(p.totalStake, currency)}</span>
             </span>
             <span className="text-muted">
-              Vinst: <span className="text-win">{formatMoney(p.totalWinnings, currency)}</span>
+              Vinst: <span className="text-win">+{formatMoney(p.totalWinnings, currency)}</span>
             </span>
+            {/* Utan den här raden ser nettot ut som ett räknefel: vinst − insats
+                går inte ihop när en del av pengarna kommer från en pott ingen vann. */}
+            {p.unwonCredit > 0 && (
+              <span className="text-muted">
+                {creditLabel}: <span className="text-win">+{formatMoney(p.unwonCredit, currency)}</span>
+              </span>
+            )}
             <span className="text-muted">
               Netto:{" "}
               <span className={cn("font-semibold", p.net > 0 ? "text-win" : p.net < 0 ? "text-lose" : "text-ink")}>
@@ -119,9 +137,19 @@ export function ResultsTable({
           </div>
         </div>
       ))}
-      <div className="flex flex-wrap gap-x-4 bg-cream-deep/50 px-4 py-3 text-sm font-medium">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 bg-cream-deep/50 px-4 py-3 text-sm font-medium">
         <span>Totalt insatt: {formatMoney(totals.stake, currency)}</span>
         <span>Totalt utbetalt: {formatMoney(totals.winnings, currency)}</span>
+        {totals.credit > 0 && (
+          <span>
+            {creditLabel}: {formatMoney(totals.credit, currency)}
+          </span>
+        )}
+        {/* Kontrollsumma: allt insatt ska ha tagit vägen någonstans. Är den inte
+            ~0 saknas pengar i bokföringen – då vägrar även computeSettlement. */}
+        <span className={cn(Math.abs(totals.net) > 0.5 && "text-lose")}>
+          Summa netto: {formatMoney(totals.net, currency)}
+        </span>
       </div>
     </Card>
   );
