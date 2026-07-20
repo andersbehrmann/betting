@@ -12,6 +12,8 @@ import {
   updateEventSettings,
   createPlatformEvent,
   setEventStatus,
+  getProposalById,
+  resolveProposal,
   setBettingOpen as qSetBettingOpen,
   setEventFlag,
   setGameActive,
@@ -403,5 +405,78 @@ export async function setAdminNote(participantId: string, note: string): Promise
   if (g) return g;
   await qSetAdminNote(participantId, note.trim() || null);
   revalidateAdmin();
+  return { ok: true };
+}
+
+// --- Spelförslag (granskning) ---
+
+const approveSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(300).nullable(),
+  stake: z.number().min(0).max(100000),
+  points: z.number().int().min(0).max(1000),
+  options: z.array(z.string().trim().min(1).max(80)).min(2).max(12),
+  adminNote: z.string().trim().max(300).nullable(),
+});
+export type ApproveProposalRaw = z.input<typeof approveSchema>;
+
+/**
+ * Godkänner ett förslag och skapar spelet som UTKAST (dolt, status='draft').
+ * Admin justerar och publicerar det sedan själv – förslag går aldrig live direkt.
+ * Admin kan ändra titel, alternativ, insats/poäng innan godkännande.
+ */
+export async function approveProposal(
+  proposalId: string,
+  raw: ApproveProposalRaw,
+): Promise<Result> {
+  const g = await guard();
+  if (g) return g;
+  const parsed = approveSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const d = parsed.data;
+
+  const proposal = await getProposalById(proposalId);
+  if (!proposal) return { ok: false, error: "Förslaget finns inte." };
+  if (proposal.status !== "pending") return { ok: false, error: "Förslaget är redan granskat." };
+
+  const admin = await getCurrentUser();
+  const gameKey = `custom_${randomBytes(4).toString("hex")}`;
+  const gameId = await createCustomGame(proposal.eventId, gameKey, {
+    title: d.title,
+    description: d.description || null,
+    stake: d.stake,
+    points: d.points,
+    options: d.options.map((label, i) => ({ value: `o${i}`, label })),
+    bettingOpen: true,
+    active: false, // dolt tills admin publicerar
+    status: "draft",
+    proposedBy: proposal.proposedBy,
+  });
+
+  await resolveProposal(proposalId, "approved", admin?.id ?? null, d.adminNote || null, gameId);
+  await insertAudit(proposal.eventId, "admin", "approve_proposal", gameId, {
+    proposalId,
+    title: d.title,
+  });
+  revalidateAdmin();
+  revalidatePath(`/admin/events/${proposal.eventId}/proposals`);
+  return { ok: true };
+}
+
+export async function rejectProposal(proposalId: string, note: string | null): Promise<Result> {
+  const g = await guard();
+  if (g) return g;
+  const proposal = await getProposalById(proposalId);
+  if (!proposal) return { ok: false, error: "Förslaget finns inte." };
+  if (proposal.status !== "pending") return { ok: false, error: "Förslaget är redan granskat." };
+
+  const admin = await getCurrentUser();
+  const trimmed = note?.trim() || null;
+  await resolveProposal(proposalId, "rejected", admin?.id ?? null, trimmed, null);
+  await insertAudit(proposal.eventId, "admin", "reject_proposal", null, {
+    proposalId,
+    title: proposal.title,
+  });
+  revalidatePath(`/admin/events/${proposal.eventId}/proposals`);
   return { ok: true };
 }
