@@ -49,7 +49,11 @@ export default async function AdminSettingsPage({
         initialTeam2={players.filter((p) => p.team === 2).map((p) => p.name)}
       />
 
-      <AddGameForm eventId={event.id} defaultStake={event.defaultStake} />
+      <AddGameForm
+        eventId={event.id}
+        defaultStake={event.defaultStake}
+        isPoints={event.eventType === "points"}
+      />
 
       <div>
         <h2 className="mb-2 px-1 font-display text-lg font-bold text-pitch">Aktiva spel</h2>

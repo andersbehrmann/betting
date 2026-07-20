@@ -15,6 +15,11 @@ export interface ParticipantStanding {
   totalStake: number;
   totalWinnings: number;
   net: number;
+  /**
+   * Summan av utdelade poäng (poäng-event). game_winners.payout bär pengar för
+   * betting-event och poäng för poäng-event – detta är samma summa som heltal.
+   */
+  points: number;
 }
 
 export interface GameStat {
@@ -82,6 +87,7 @@ export async function computeStandings(eventId: string): Promise<Standings> {
       totalStake,
       totalWinnings,
       net: round2(totalWinnings - totalStake),
+      points: Math.round(winningsByParticipant[p.id] ?? 0),
     };
   });
 

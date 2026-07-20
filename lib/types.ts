@@ -70,6 +70,8 @@ export interface GameRow {
   title: string;
   description: string | null;
   stake: number;
+  /** Poängvärde – används i stället för pott/insats när event.eventType === "points". */
+  points: number;
   isJackpot: boolean;
   active: boolean;
   bettingOpen: boolean;

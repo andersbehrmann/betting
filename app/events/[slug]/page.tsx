@@ -5,7 +5,7 @@ import { AuthNav } from "@/components/auth/auth-nav";
 import { Card, Badge } from "@/components/ui";
 import { JoinButton } from "@/components/events/join-button";
 import { getCurrentUser } from "@/lib/auth";
-import { getEventBySlug, getMembership, getParticipants } from "@/lib/queries";
+import { getEventBySlug, getMembership, getParticipants, getGames } from "@/lib/queries";
 import { formatCents } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +19,14 @@ export default async function EventDetailPage({
   const event = await getEventBySlug(slug);
   if (!event || event.status === "draft") notFound();
 
-  const [user, participants] = await Promise.all([getCurrentUser(), getParticipants(event.id)]);
+  const [user, participants, games] = await Promise.all([
+    getCurrentUser(),
+    getParticipants(event.id),
+    getGames(event.id, true),
+  ]);
   const membership = user ? await getMembership(event.id, user.id) : null;
-  const isFootball = event.teamOne != null; // legacy match-event → spela på /events/[slug]/play
+  // Spelbart så snart eventet har aktiva spel – gäller både match- och poäng-event.
+  const hasGames = games.length > 0;
 
   return (
     <>
@@ -85,12 +90,12 @@ export default async function EventDetailPage({
                   <Badge tone="red">Avgift ej betald</Badge>
                 )}
               </div>
-              {isFootball ? (
+              {hasGames ? (
                 <Link
                   href={`/events/${event.slug}/play`}
                   className="mt-4 inline-block font-medium text-grass hover:underline"
                 >
-                  Till tipsningen →
+                  {event.eventType === "points" ? "Till frågorna →" : "Till tipsningen →"}
                 </Link>
               ) : (
                 <p className="mt-3 text-sm text-muted">

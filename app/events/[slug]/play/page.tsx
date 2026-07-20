@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { MatchBanner } from "@/components/match-banner";
+import { EventBanner } from "@/components/event-banner";
 import { JoinForm } from "@/components/participant/join-form";
 import { BettingBoard } from "@/components/participant/betting-board";
 import { AuthNav } from "@/components/auth/auth-nav";
@@ -71,7 +72,12 @@ async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<ty
 
   return (
     <div className="space-y-4">
-      <MatchBanner event={event} locked={locked} />
+      {/* Match-event får lag/avspark-bannern, generiska event en neutral. */}
+      {event.teamOne ? (
+        <MatchBanner event={event} locked={locked} />
+      ) : (
+        <EventBanner event={event} locked={locked} />
+      )}
 
       {!joined ? (
         locked ? (
