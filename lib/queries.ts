@@ -14,6 +14,7 @@ import type {
   UserRow,
   ProposalRow,
   ProposalStatus,
+  FriendLeaderboardRow,
 } from "./types";
 import type { Answer, GameResult } from "./scoring/types";
 
@@ -545,6 +546,109 @@ export async function getAuditLog(eventId: string, limit = 100): Promise<AuditRo
     detail: r.detail,
     createdAt: toDate(r.created_at),
   }));
+}
+
+// --- Kompis-leaderboards (privata delligor) ---
+
+function mapFriendLeaderboard(r: any): FriendLeaderboardRow {
+  return {
+    id: r.id,
+    eventId: r.event_id,
+    ownerUserId: r.owner_user_id,
+    name: r.name,
+    inviteCode: r.invite_code,
+    memberCount: num(r.member_count ?? 0),
+    createdAt: toDate(r.created_at),
+  };
+}
+
+export async function createFriendLeaderboard(
+  eventId: string,
+  ownerUserId: string,
+  name: string,
+  inviteCode: string,
+): Promise<FriendLeaderboardRow> {
+  // Ägaren blir automatiskt medlem i sin egen liga.
+  const rows = await sql`
+    INSERT INTO friend_leaderboards (event_id, owner_user_id, name, invite_code)
+    VALUES (${eventId}, ${ownerUserId}, ${name}, ${inviteCode})
+    RETURNING *`;
+  const lb = mapFriendLeaderboard(rows[0]);
+  await sql`
+    INSERT INTO friend_leaderboard_members (leaderboard_id, user_id, status)
+    VALUES (${lb.id}, ${ownerUserId}, 'joined')
+    ON CONFLICT (leaderboard_id, user_id) DO NOTHING`;
+  return lb;
+}
+
+/** Ligor i eventet som användaren är medlem i. */
+export async function listFriendLeaderboardsForUser(
+  eventId: string,
+  userId: string,
+): Promise<FriendLeaderboardRow[]> {
+  const rows = await sql`
+    SELECT l.*, (SELECT count(*) FROM friend_leaderboard_members m2
+                 WHERE m2.leaderboard_id = l.id AND m2.status = 'joined') AS member_count
+    FROM friend_leaderboards l
+    JOIN friend_leaderboard_members m ON m.leaderboard_id = l.id
+    WHERE l.event_id = ${eventId} AND m.user_id = ${userId} AND m.status = 'joined'
+    ORDER BY l.created_at`;
+  return rows.map(mapFriendLeaderboard);
+}
+
+export async function getFriendLeaderboardById(
+  id: string,
+): Promise<FriendLeaderboardRow | null> {
+  const rows = await sql`
+    SELECT l.*, (SELECT count(*) FROM friend_leaderboard_members m
+                 WHERE m.leaderboard_id = l.id AND m.status = 'joined') AS member_count
+    FROM friend_leaderboards l WHERE l.id = ${id}`;
+  return rows[0] ? mapFriendLeaderboard(rows[0]) : null;
+}
+
+export async function getFriendLeaderboardByInviteCode(
+  code: string,
+): Promise<FriendLeaderboardRow | null> {
+  const rows = await sql`
+    SELECT l.*, 0 AS member_count FROM friend_leaderboards l WHERE l.invite_code = ${code}`;
+  return rows[0] ? mapFriendLeaderboard(rows[0]) : null;
+}
+
+/**
+ * Är användaren medlem? Detta är sekretessgrinden – en liga får ALDRIG visas
+ * för någon som inte är med.
+ */
+export async function isFriendLeaderboardMember(
+  leaderboardId: string,
+  userId: string,
+): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 FROM friend_leaderboard_members
+    WHERE leaderboard_id = ${leaderboardId} AND user_id = ${userId} AND status = 'joined'
+    LIMIT 1`;
+  return rows.length > 0;
+}
+
+export async function addFriendLeaderboardMember(
+  leaderboardId: string,
+  userId: string,
+): Promise<void> {
+  await sql`
+    INSERT INTO friend_leaderboard_members (leaderboard_id, user_id, status)
+    VALUES (${leaderboardId}, ${userId}, 'joined')
+    ON CONFLICT (leaderboard_id, user_id) DO UPDATE SET status = 'joined'`;
+}
+
+/** Deltagarrader i eventet för ligans medlemmar – underlag för privat ställning. */
+export async function getFriendLeaderboardParticipantIds(
+  leaderboardId: string,
+  eventId: string,
+): Promise<string[]> {
+  const rows = await sql`
+    SELECT p.id FROM friend_leaderboard_members m
+    JOIN participants p ON p.user_id = m.user_id AND p.event_id = ${eventId}
+    WHERE m.leaderboard_id = ${leaderboardId} AND m.status = 'joined'`;
+  return (rows as any[]).map((r) => r.id as string);
 }
 
 // --- Spelförslag ---

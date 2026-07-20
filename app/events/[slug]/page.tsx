@@ -119,12 +119,20 @@ export default async function EventDetailPage({
                 {event.joinFeeCents > 0 && <Badge tone="green">Avgift betald</Badge>}
               </div>
               {hasGames ? (
-                <Link
-                  href={`/events/${event.slug}/play`}
-                  className="mt-4 inline-block font-medium text-grass hover:underline"
-                >
-                  {event.eventType === "points" ? "Till frågorna →" : "Till tipsningen →"}
-                </Link>
+                <div className="mt-4 flex flex-col gap-2">
+                  <Link
+                    href={`/events/${event.slug}/play`}
+                    className="font-medium text-grass hover:underline"
+                  >
+                    {event.eventType === "points" ? "Till frågorna →" : "Till tipsningen →"}
+                  </Link>
+                  <Link
+                    href={`/events/${event.slug}/friends`}
+                    className="text-sm text-muted hover:text-pitch"
+                  >
+                    👥 Kompisligor – tävla i en privat liga
+                  </Link>
+                </div>
               ) : (
                 <p className="mt-3 text-sm text-muted">
                   Spelen läggs upp av admin. Håll utkik – du kan snart lägga dina svar här.

@@ -100,6 +100,16 @@ export interface ProposalRow {
   createdAt: Date;
 }
 
+export interface FriendLeaderboardRow {
+  id: string;
+  eventId: string;
+  ownerUserId: string;
+  name: string;
+  inviteCode: string;
+  memberCount: number;
+  createdAt: Date;
+}
+
 export interface BetRow {
   id: string;
   participantId: string;
