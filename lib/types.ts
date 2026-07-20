@@ -3,7 +3,9 @@
 import type { GameResult, Answer, ClosestResultMode, GameOption } from "./scoring/types";
 
 export type PaymentStatus = "unpaid" | "paid" | "settled";
-export type GameStatus = "open" | "closed" | "awaiting_result" | "settled";
+// "draft" = skapat från ett godkänt förslag, men ännu inte publicerat av admin.
+export type GameStatus = "draft" | "open" | "closed" | "awaiting_result" | "settled";
+export type ProposalStatus = "pending" | "approved" | "rejected";
 export type EventType = "betting" | "points";
 export type EventStatus = "draft" | "open" | "closed";
 export type JoinFeeStatus = "none" | "pending" | "paid" | "refunded";
@@ -81,6 +83,21 @@ export interface GameRow {
   resultData: GameResult | null;
   status: GameStatus;
   settledAt: Date | null;
+}
+
+export interface ProposalRow {
+  id: string;
+  eventId: string;
+  proposedBy: string;
+  /** Förslagsställarens namn (joinat från users) – för admins granskningsvy. */
+  proposerName: string | null;
+  title: string;
+  description: string | null;
+  suggestedOptions: GameOption[] | null;
+  status: ProposalStatus;
+  adminNote: string | null;
+  createdGameId: string | null;
+  createdAt: Date;
 }
 
 export interface BetRow {

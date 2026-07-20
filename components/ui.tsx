@@ -84,6 +84,7 @@ export function Badge({
 }
 
 const GAME_STATUS_META: Record<GameStatus, { label: string; tone: "green" | "gold" | "muted" | "neutral" }> = {
+  draft: { label: "Utkast", tone: "muted" },
   open: { label: "Öppen", tone: "green" },
   closed: { label: "Stängd", tone: "neutral" },
   awaiting_result: { label: "Väntar på facit", tone: "muted" },

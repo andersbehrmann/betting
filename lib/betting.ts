@@ -21,6 +21,8 @@ export function isGameBettable(
 ): boolean {
   return (
     game.active &&
+    // Utkast (från godkända förslag) är inte publicerade än.
+    game.status !== "draft" &&
     game.status !== "settled" &&
     game.bettingOpen &&
     isGloballyOpen(event, now)

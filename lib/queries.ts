@@ -12,6 +12,8 @@ import type {
   PaymentStatus,
   GameStatus,
   UserRow,
+  ProposalRow,
+  ProposalStatus,
 } from "./types";
 import type { Answer, GameResult } from "./scoring/types";
 
@@ -386,6 +388,13 @@ export interface CustomGameInput {
   points: number;
   options: { value: string; label: string }[];
   bettingOpen: boolean;
+  /**
+   * Utkast från ett godkänt förslag skapas dolt (active=false, status='draft')
+   * så admin kan finjustera innan det publiceras. Default: publicerat direkt.
+   */
+  active?: boolean;
+  status?: "draft" | "open";
+  proposedBy?: string | null;
 }
 
 /** Skapar ett eget (custom) flervalsspel. Returnerar spelets id. */
@@ -398,10 +407,12 @@ export async function createCustomGame(
   const sortOrder = num(nextOrder[0].n);
   const rows = await sql`
     INSERT INTO games
-      (event_id, game_key, title, description, stake, points, is_jackpot, is_custom, active, betting_open, sort_order, status, options)
+      (event_id, game_key, title, description, stake, points, is_jackpot, is_custom, active,
+       betting_open, sort_order, status, options, proposed_by)
     VALUES
       (${eventId}, ${gameKey}, ${input.title}, ${input.description}, ${input.stake}, ${input.points},
-       false, true, true, ${input.bettingOpen}, ${sortOrder}, 'open', ${JSON.stringify(input.options)}::jsonb)
+       false, true, ${input.active ?? true}, ${input.bettingOpen}, ${sortOrder},
+       ${input.status ?? "open"}, ${JSON.stringify(input.options)}::jsonb, ${input.proposedBy ?? null})
     RETURNING id`;
   return rows[0].id as string;
 }
@@ -534,6 +545,94 @@ export async function getAuditLog(eventId: string, limit = 100): Promise<AuditRo
     detail: r.detail,
     createdAt: toDate(r.created_at),
   }));
+}
+
+// --- Spelförslag ---
+
+function mapProposal(r: any): ProposalRow {
+  return {
+    id: r.id,
+    eventId: r.event_id,
+    proposedBy: r.proposed_by,
+    proposerName: r.proposer_name ?? null,
+    title: r.title,
+    description: r.description ?? null,
+    suggestedOptions: r.suggested_options ?? null,
+    status: r.status,
+    adminNote: r.admin_note ?? null,
+    createdGameId: r.created_game_id ?? null,
+    createdAt: toDate(r.created_at),
+  };
+}
+
+export async function createProposal(input: {
+  eventId: string;
+  proposedBy: string;
+  title: string;
+  description: string | null;
+  suggestedOptions: { value: string; label: string }[];
+}): Promise<ProposalRow> {
+  const rows = await sql`
+    INSERT INTO game_proposals (event_id, proposed_by, title, description, suggested_options)
+    VALUES (${input.eventId}, ${input.proposedBy}, ${input.title}, ${input.description},
+            ${JSON.stringify(input.suggestedOptions)}::jsonb)
+    RETURNING *`;
+  return mapProposal(rows[0]);
+}
+
+/** Förslag för ett event, nyast först. Joinar in förslagsställarens namn. */
+export async function listProposals(
+  eventId: string,
+  status?: ProposalStatus,
+): Promise<ProposalRow[]> {
+  const rows = status
+    ? await sql`
+        SELECT p.*, u.name AS proposer_name FROM game_proposals p
+        JOIN users u ON u.id = p.proposed_by
+        WHERE p.event_id = ${eventId} AND p.status = ${status}
+        ORDER BY p.created_at DESC`
+    : await sql`
+        SELECT p.*, u.name AS proposer_name FROM game_proposals p
+        JOIN users u ON u.id = p.proposed_by
+        WHERE p.event_id = ${eventId}
+        ORDER BY p.created_at DESC`;
+  return rows.map(mapProposal);
+}
+
+export async function countPendingProposals(eventId: string): Promise<number> {
+  const rows = await sql`
+    SELECT count(*)::int AS n FROM game_proposals
+    WHERE event_id = ${eventId} AND status = 'pending'`;
+  return num(rows[0].n);
+}
+
+export async function getProposalById(id: string): Promise<ProposalRow | null> {
+  const rows = await sql`
+    SELECT p.*, u.name AS proposer_name FROM game_proposals p
+    JOIN users u ON u.id = p.proposed_by
+    WHERE p.id = ${id}`;
+  return rows[0] ? mapProposal(rows[0]) : null;
+}
+
+/** Markerar ett förslag som granskat (godkänt/avslaget). */
+export async function resolveProposal(
+  id: string,
+  status: "approved" | "rejected",
+  reviewedBy: string | null,
+  adminNote: string | null,
+  createdGameId: string | null,
+): Promise<void> {
+  await sql`
+    UPDATE game_proposals
+    SET status = ${status}, reviewed_by = ${reviewedBy}, admin_note = ${adminNote},
+        created_game_id = ${createdGameId}, reviewed_at = now()
+    WHERE id = ${id}`;
+}
+
+/** Adminanvändare – för notiser om nya förslag. */
+export async function getAdminUsers(): Promise<UserRow[]> {
+  const rows = await sql`SELECT * FROM users WHERE is_admin = true`;
+  return rows.map(mapUser);
 }
 
 // --- Users / Sessions / Auth ---

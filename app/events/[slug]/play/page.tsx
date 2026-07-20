@@ -14,6 +14,8 @@ import {
   getBetsForParticipant,
 } from "@/lib/queries";
 import { resolveParticipant, hasPaidAccess } from "@/lib/participants";
+import { getCurrentUser } from "@/lib/auth";
+import { ProposeGameForm } from "@/components/participant/propose-game-form";
 import { buildGameViews } from "@/lib/view";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { describeAnswer } from "@/lib/describe";
@@ -66,7 +68,7 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
 }
 
 async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>> }) {
-  const participant = await resolveParticipant(event.id);
+  const [participant, user] = await Promise.all([resolveParticipant(event.id), getCurrentUser()]);
   const joined = participant !== null;
   // Medlem men obetald avgift → får inte spela förrän webhooken bekräftat betalningen.
   const unpaid = participant !== null && !hasPaidAccess(event, participant);
@@ -119,7 +121,16 @@ async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<ty
           <JoinForm eventId={event.id} />
         )
       ) : (
-        <JoinedContent event={event} participantId={participant!.id} participantName={participant!.name} locked={locked} />
+        <>
+          <JoinedContent
+            event={event}
+            participantId={participant!.id}
+            participantName={participant!.name}
+            locked={locked}
+          />
+          {/* Kräver konto – anonyma legacy-deltagare har ingen användare att koppla förslaget till. */}
+          {user && event.status === "open" && <ProposeGameForm eventId={event.id} />}
+        </>
       )}
     </div>
   );

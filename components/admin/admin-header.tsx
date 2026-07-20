@@ -17,6 +17,7 @@ export function AdminHeader() {
   const eventTabs = eventId
     ? [
         { href: `/admin/events/${eventId}`, label: "Översikt" },
+        { href: `/admin/events/${eventId}/proposals`, label: "Förslag" },
         { href: `/admin/events/${eventId}/settings`, label: "Inställningar" },
         { href: `/admin/events/${eventId}/results`, label: "Resultat" },
       ]

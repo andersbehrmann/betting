@@ -9,7 +9,10 @@ import {
   getAllBets,
   getAllWinners,
   getParticipants,
+  countPendingProposals,
 } from "@/lib/queries";
+import Link from "next/link";
+import { Card } from "@/components/ui";
 import { computeStandings } from "@/lib/standings";
 import { buildGameViews } from "@/lib/view";
 import { describeAnswer } from "@/lib/describe";
@@ -26,14 +29,16 @@ export default async function AdminOverviewPage({
   const event = await getEventById(id);
   if (!event) notFound();
 
-  const [games, players, bets, winners, participants, standings] = await Promise.all([
-    getGames(event.id),
-    getPlayers(event.id),
-    getAllBets(event.id),
-    getAllWinners(event.id),
-    getParticipants(event.id),
-    computeStandings(event.id),
-  ]);
+  const [games, players, bets, winners, participants, standings, pendingProposals] =
+    await Promise.all([
+      getGames(event.id),
+      getPlayers(event.id),
+      getAllBets(event.id),
+      getAllWinners(event.id),
+      getParticipants(event.id),
+      computeStandings(event.id),
+      countPendingProposals(event.id),
+    ]);
 
   const views = buildGameViews(
     games.map((g) => ({
@@ -60,9 +65,23 @@ export default async function AdminOverviewPage({
       <div>
         <h1 className="font-display text-2xl font-bold text-pitch">{event.name}</h1>
         <p className="text-sm text-muted">
-          {event.teamOne} vs {event.teamTwo} · {participants.length} deltagare
+          {/* Lagraden gäller bara match-event; generiska event saknar lag. */}
+          {event.teamOne && event.teamTwo && `${event.teamOne} vs ${event.teamTwo} · `}
+          {participants.length} deltagare
         </p>
       </div>
+
+      {pendingProposals > 0 && (
+        <Link href={`/admin/events/${event.id}/proposals`} className="block">
+          <Card className="border-gold/50 bg-gold/10 p-4 transition-colors hover:bg-gold/15">
+            <p className="text-sm font-medium text-ink">
+              💡 {pendingProposals} {pendingProposals === 1 ? "spelförslag" : "spelförslag"} väntar
+              på granskning
+            </p>
+            <p className="mt-0.5 text-xs text-muted">Klicka för att granska →</p>
+          </Card>
+        </Link>
+      )}
 
       <AdminControls
         eventId={event.id}
