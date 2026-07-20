@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 import { Button, Card, Input, Label, Textarea } from "@/components/ui";
 import { addCustomGame } from "@/app/admin/actions";
 
-export function AddGameForm({ eventId, defaultStake }: { eventId: string; defaultStake: number }) {
+export function AddGameForm({
+  eventId,
+  defaultStake,
+  isPoints = false,
+}: {
+  eventId: string;
+  defaultStake: number;
+  isPoints?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [stake, setStake] = useState(defaultStake);
+  const [points, setPoints] = useState(1);
   const [optionsText, setOptionsText] = useState("");
   const [bettingOpen, setBettingOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +29,7 @@ export function AddGameForm({ eventId, defaultStake }: { eventId: string; defaul
     setTitle("");
     setDescription("");
     setStake(defaultStake);
+    setPoints(1);
     setOptionsText("");
     setBettingOpen(true);
   }
@@ -40,6 +50,7 @@ export function AddGameForm({ eventId, defaultStake }: { eventId: string; defaul
         title,
         description: description || null,
         stake: Number(stake),
+        points: Number(points),
         bettingOpen,
         options,
       });
@@ -84,8 +95,29 @@ export function AddGameForm({ eventId, defaultStake }: { eventId: string; defaul
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>Insats</Label>
-            <Input type="number" min={0} step="0.5" value={stake} onChange={(e) => setStake(Number(e.target.value))} />
+            {isPoints ? (
+              <>
+                <Label>Poäng för rätt svar</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={points}
+                  onChange={(e) => setPoints(Number(e.target.value))}
+                />
+              </>
+            ) : (
+              <>
+                <Label>Insats</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={stake}
+                  onChange={(e) => setStake(Number(e.target.value))}
+                />
+              </>
+            )}
           </div>
           <div className="flex items-end">
             <button

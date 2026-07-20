@@ -123,10 +123,12 @@ export async function setEventStatusAction(
 
 const settingsSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  teamOne: z.string().trim().min(1).max(60),
-  teamTwo: z.string().trim().min(1).max(60),
-  matchStart: z.string().min(1),
-  bettingDeadline: z.string().min(1),
+  // Match-specifika fält är valfria – generiska event (t.ex. poäng-event) saknar
+  // lag, avspark och tipsstopp. Tomt fält sparas som NULL.
+  teamOne: z.string().trim().max(60),
+  teamTwo: z.string().trim().max(60),
+  matchStart: z.string(),
+  bettingDeadline: z.string(),
   currency: z.string().trim().min(1).max(8),
   defaultStake: z.number().min(0).max(100000),
   jackpotStake: z.number().min(0).max(100000),
@@ -142,10 +144,10 @@ export type SettingsInputRaw = z.input<typeof settingsSchema>;
 function toEventSettings(raw: z.infer<typeof settingsSchema>): EventSettingsInput {
   return {
     name: raw.name,
-    teamOne: raw.teamOne,
-    teamTwo: raw.teamTwo,
-    matchStart: fromDatetimeLocal(raw.matchStart),
-    bettingDeadline: fromDatetimeLocal(raw.bettingDeadline),
+    teamOne: raw.teamOne || null,
+    teamTwo: raw.teamTwo || null,
+    matchStart: raw.matchStart ? fromDatetimeLocal(raw.matchStart) : null,
+    bettingDeadline: raw.bettingDeadline ? fromDatetimeLocal(raw.bettingDeadline) : null,
     currency: raw.currency,
     defaultStake: raw.defaultStake,
     jackpotStake: raw.jackpotStake,
@@ -241,6 +243,8 @@ const customGameSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(300).nullable(),
   stake: z.number().min(0).max(100000),
+  // Poängvärde för poäng-event (default 1). Ignoreras av betting-event.
+  points: z.number().int().min(0).max(1000).default(1),
   bettingOpen: z.boolean(),
   options: z.array(z.string().trim().min(1).max(80)).min(2).max(12),
 });
@@ -265,6 +269,7 @@ export async function addCustomGame(eventId: string, raw: CustomGameInputRaw): P
     title: data.title,
     description: data.description || null,
     stake: data.stake,
+    points: data.points,
     options,
     bettingOpen: data.bettingOpen,
   });

@@ -41,7 +41,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ sl
           </Card>
         ) : (
           <>
-            <Board eventId={event.id} currency={event.currency} />
+            <Board eventId={event.id} currency={event.currency} isPoints={event.eventType === "points"} />
             {event.betsPublic && <AllTips event={event} />}
           </>
         )}
@@ -50,9 +50,20 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ sl
   );
 }
 
-async function Board({ eventId, currency }: { eventId: string; currency: string }) {
+async function Board({
+  eventId,
+  currency,
+  isPoints,
+}: {
+  eventId: string;
+  currency: string;
+  isPoints: boolean;
+}) {
   const { participants } = await computeStandings(eventId);
-  const ranked = [...participants].sort((a, b) => b.net - a.net || b.wins - a.wins);
+  // Poäng-event rankas på poäng, betting-event på netto.
+  const ranked = [...participants].sort((a, b) =>
+    isPoints ? b.points - a.points || b.wins - a.wins : b.net - a.net || b.wins - a.wins,
+  );
 
   return (
     <div className="space-y-4">
@@ -65,8 +76,8 @@ async function Board({ eventId, currency }: { eventId: string; currency: string 
           <div className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-3 bg-cream-deep/60 px-4 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wide text-muted">
             <span>#</span>
             <span>Namn</span>
-            <span className="text-right">Vinster</span>
-            <span className="text-right">Netto</span>
+            <span className="text-right">{isPoints ? "Rätt" : "Vinster"}</span>
+            <span className="text-right">{isPoints ? "Poäng" : "Netto"}</span>
           </div>
           {ranked.map((p, i) => (
             <div key={p.id} className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-3 px-4 py-3">
@@ -75,15 +86,21 @@ async function Board({ eventId, currency }: { eventId: string; currency: string 
               </span>
               <span className="truncate font-medium text-ink">{p.name}</span>
               <span className="text-right tabular-nums text-muted">{p.wins}</span>
-              <span
-                className={cn(
-                  "text-right font-display font-bold tabular-nums",
-                  p.net > 0 ? "text-win" : p.net < 0 ? "text-lose" : "text-muted",
-                )}
-              >
-                {p.net > 0 ? "+" : ""}
-                {formatMoney(p.net, currency)}
-              </span>
+              {isPoints ? (
+                <span className="text-right font-display font-bold tabular-nums text-ink">
+                  {p.points} p
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "text-right font-display font-bold tabular-nums",
+                    p.net > 0 ? "text-win" : p.net < 0 ? "text-lose" : "text-muted",
+                  )}
+                >
+                  {p.net > 0 ? "+" : ""}
+                  {formatMoney(p.net, currency)}
+                </span>
+              )}
             </div>
           ))}
         </Card>

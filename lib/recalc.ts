@@ -20,10 +20,19 @@ export interface RecalcResult {
   perWinner: number;
 }
 
-/** Räknar om vinnare + utbetalningar för ett spel utifrån aktuellt facit. */
+/**
+ * Räknar om vinnare + utdelning för ett spel utifrån aktuellt facit.
+ *
+ * Vinnardetekteringen är gemensam för båda event-typerna – det enda som skiljer
+ * är vad varje vinnare tilldelas (lagras i game_winners.payout):
+ *   betting → sin andel av potten, points → spelets poängvärde.
+ */
 export async function recalcGame(gameId: string, audit = true): Promise<RecalcResult> {
   const game = await getGameById(gameId);
   if (!game) throw new Error("Spel saknas.");
+
+  const event = await getEventById(game.eventId);
+  const isPoints = event?.eventType === "points";
 
   const bets = await getBetsForGame(gameId);
   const pot = potFor(bets.length, game.stake);
@@ -41,7 +50,6 @@ export async function recalcGame(gameId: string, audit = true): Promise<RecalcRe
     }));
     winnerIds = computePackageWinners(pkgBets, game.resultData as PackageResult).winnerIds;
   } else {
-    const event = await getEventById(game.eventId);
     const result = computeGameWinners(
       game.gameKey as AnyGameKey,
       bets.map((b) => ({ participantId: b.participantId, answer: b.answerData })),
@@ -51,7 +59,8 @@ export async function recalcGame(gameId: string, audit = true): Promise<RecalcRe
     winnerIds = result.winnerIds;
   }
 
-  const perWinner = payoutPerWinner(pot, winnerIds.length);
+  // Poäng-event: alla som svarat rätt får spelets fulla poäng (ingen delning).
+  const perWinner = isPoints ? game.points : payoutPerWinner(pot, winnerIds.length);
   await replaceGameWinners(
     gameId,
     winnerIds.map((id) => ({ participantId: id, payout: perWinner, isManual: false })),

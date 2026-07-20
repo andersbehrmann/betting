@@ -73,6 +73,7 @@ function mapGame(r: any): GameRow {
     title: r.title,
     description: r.description,
     stake: num(r.stake),
+    points: num(r.points ?? 0),
     isJackpot: r.is_jackpot,
     active: r.active,
     bettingOpen: r.betting_open,
@@ -330,6 +331,8 @@ export interface CustomGameInput {
   title: string;
   description: string | null;
   stake: number;
+  /** Poängvärde för poäng-event (ignoreras av betting-event). */
+  points: number;
   options: { value: string; label: string }[];
   bettingOpen: boolean;
 }
@@ -344,9 +347,9 @@ export async function createCustomGame(
   const sortOrder = num(nextOrder[0].n);
   const rows = await sql`
     INSERT INTO games
-      (event_id, game_key, title, description, stake, is_jackpot, is_custom, active, betting_open, sort_order, status, options)
+      (event_id, game_key, title, description, stake, points, is_jackpot, is_custom, active, betting_open, sort_order, status, options)
     VALUES
-      (${eventId}, ${gameKey}, ${input.title}, ${input.description}, ${input.stake},
+      (${eventId}, ${gameKey}, ${input.title}, ${input.description}, ${input.stake}, ${input.points},
        false, true, true, ${input.bettingOpen}, ${sortOrder}, 'open', ${JSON.stringify(input.options)}::jsonb)
     RETURNING id`;
   return rows[0].id as string;
