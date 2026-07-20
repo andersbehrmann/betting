@@ -8,12 +8,14 @@ import {
   getGames,
   participantNameExists,
   createParticipant,
-  getParticipantByToken,
+  createMembership,
+  getMembership,
   saveBets,
   getBetsForParticipant,
   type BetInput,
 } from "@/lib/queries";
-import { setParticipantToken, getParticipantToken } from "@/lib/auth";
+import { setParticipantToken, getCurrentUser } from "@/lib/auth";
+import { resolveParticipant } from "@/lib/participants";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { getGameDefinition } from "@/lib/scoring/games";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
@@ -41,16 +43,43 @@ export async function joinEvent(eventId: string, rawName: string): Promise<Actio
 
   const event = await getEventById(eventId);
   if (!event) return { ok: false, error: "Eventet finns inte." };
+  if (event.status !== "open") {
+    return { ok: false, error: "Eventet tar inte emot nya deltagare." };
+  }
   if (isLocked(event)) return { ok: false, error: "Tipsningen är stängd." };
+
+  const user = await getCurrentUser();
+
+  // Redan medlem via konto? Då är man med – idempotent.
+  if (user) {
+    const existing = await getMembership(eventId, user.id);
+    if (existing) return { ok: true };
+  }
+
+  // Avgiftsbelagda event får aldrig anslutas gratis här – de går via eventsidan
+  // (konto + betalning). Annars vore hela avgiften kringgåelig.
+  if (event.joinFeeCents > 0) {
+    return {
+      ok: false,
+      error: "Det här eventet har en anslutningsavgift – anslut via eventsidan.",
+    };
+  }
 
   if (await participantNameExists(eventId, name)) {
     return { ok: false, error: "Namnet är redan taget i det här eventet. Välj ett annat." };
   }
 
-  const token = randomBytes(16).toString("hex");
-  await createParticipant(eventId, name, token);
-  await setParticipantToken(token);
-  revalidatePath("/events");
+  if (user) {
+    // Inloggad → kontobaserat medlemskap (ingen deltagar-cookie behövs).
+    await createMembership(eventId, user.id, name, "none");
+  } else {
+    // Anonym gäst → legacy-token (gratis event, t.ex. en snabb tipskväll).
+    const token = randomBytes(16).toString("hex");
+    await createParticipant(eventId, name, token);
+    await setParticipantToken(token);
+  }
+
+  revalidatePath(`/events/${event.slug}/play`);
   return { ok: true };
 }
 
@@ -92,17 +121,13 @@ export interface SubmitSelection {
 }
 
 export async function submitBets(eventId: string, selections: SubmitSelection[]): Promise<ActionResult> {
-  const token = await getParticipantToken();
-  if (!token) return { ok: false, error: "Du är inte inloggad som deltagare." };
-  const participant = await getParticipantByToken(token);
-  if (!participant) return { ok: false, error: "Din deltagarsession är ogiltig." };
-
   const event = await getEventById(eventId);
   if (!event) return { ok: false, error: "Eventet finns inte." };
-  // Deltagaren måste tillhöra just detta event (medlemskap via deltagar-token).
-  if (event.id !== participant.eventId) {
-    return { ok: false, error: "Du är inte deltagare i det här eventet." };
-  }
+
+  // Konto-medlemskap ELLER legacy-token – resolvern garanterar rätt event.
+  const participant = await resolveParticipant(event.id);
+  if (!participant) return { ok: false, error: "Du är inte deltagare i det här eventet." };
+
   if (!isGloballyOpen(event)) {
     return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };
   }

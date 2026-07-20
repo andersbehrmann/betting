@@ -6,10 +6,10 @@ import {
   getEventBySlug,
   getGames,
   getPlayers,
-  getParticipantByToken,
   getBetsForParticipant,
 } from "@/lib/queries";
-import { getParticipantToken } from "@/lib/auth";
+import { resolveParticipant } from "@/lib/participants";
+import { AuthNav } from "@/components/auth/auth-nav";
 import { buildGameViews } from "@/lib/view";
 import { describeAnswer } from "@/lib/describe";
 import { SettlementList } from "@/components/settlement-list";
@@ -30,27 +30,29 @@ export default async function MyBetsPage({
   const event = await getEventBySlug(slug);
   if (!event || event.status === "draft") notFound();
 
-  const token = await getParticipantToken();
-  const participant = token ? await getParticipantByToken(token) : null;
-  const joined = participant && participant.eventId === event.id;
+  const participant = await resolveParticipant(event.id);
+  const joined = participant !== null;
 
   return (
     <>
       <SiteHeader
         right={
-          <Link
-            href={`/events/${event.slug}/play`}
-            className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
-          >
-            Till spelen
-          </Link>
+          <>
+            <Link
+              href={`/events/${event.slug}/play`}
+              className="rounded-lg px-2.5 py-1.5 text-muted hover:text-pitch"
+            >
+              Till spelen
+            </Link>
+            <AuthNav />
+          </>
         }
       />
       <main className="mx-auto max-w-xl px-4 pt-4 pb-16">
         {!joined ? (
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Du har inga tips ännu</p>
-            <p className="mt-1 text-sm text-muted">Gå till startsidan och häng med i tipsleken.</p>
+            <p className="mt-1 text-sm text-muted">Gå med i eventet så kommer dina tips upp här.</p>
             <Link
               href={`/events/${event.slug}/play`}
               className="mt-3 inline-block font-medium text-grass hover:underline"

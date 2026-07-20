@@ -10,10 +10,9 @@ import {
   getEventBySlug,
   getGames,
   getPlayers,
-  getParticipantByToken,
   getBetsForParticipant,
 } from "@/lib/queries";
-import { getParticipantToken } from "@/lib/auth";
+import { resolveParticipant } from "@/lib/participants";
 import { buildGameViews } from "@/lib/view";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { describeAnswer } from "@/lib/describe";
@@ -66,9 +65,8 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
 }
 
 async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>> }) {
-  const token = await getParticipantToken();
-  const participant = token ? await getParticipantByToken(token) : null;
-  const joined = participant && participant.eventId === event.id;
+  const participant = await resolveParticipant(event.id);
+  const joined = participant !== null;
   const locked = !isGloballyOpen(event);
 
   return (
@@ -80,6 +78,20 @@ async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<ty
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Tipsningen är stängd</p>
             <p className="mt-1 text-sm text-muted">Det går inte längre att lämna nya tips för den här matchen.</p>
+          </Card>
+        ) : event.joinFeeCents > 0 ? (
+          // Avgiftsbelagt event ansluts via eventsidan (konto + betalning), aldrig här.
+          <Card className="p-6 text-center">
+            <p className="font-display text-lg text-pitch">Anslut till eventet först</p>
+            <p className="mt-1 text-sm text-muted">
+              Det här eventet har en anslutningsavgift.
+            </p>
+            <Link
+              href={`/events/${event.slug}`}
+              className="mt-3 inline-block font-medium text-grass hover:underline"
+            >
+              Till eventsidan →
+            </Link>
           </Card>
         ) : (
           <JoinForm eventId={event.id} />
