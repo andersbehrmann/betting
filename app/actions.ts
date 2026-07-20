@@ -15,7 +15,7 @@ import {
   type BetInput,
 } from "@/lib/queries";
 import { setParticipantToken, getCurrentUser } from "@/lib/auth";
-import { resolveParticipant, hasPaidAccess } from "@/lib/participants";
+import { resolveParticipant, hasPaidAccess, rememberParticipantOnDevice } from "@/lib/participants";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { getGameDefinition } from "@/lib/scoring/games";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
@@ -50,10 +50,14 @@ export async function joinEvent(eventId: string, rawName: string): Promise<Actio
 
   const user = await getCurrentUser();
 
-  // Redan medlem via konto? Då är man med – idempotent.
+  // Redan medlem via konto? Då är man med – idempotent. Passa på att lägga
+  // deltagar-cookien på den här enheten så sessionen inte är enda vägen in.
   if (user) {
     const existing = await getMembership(eventId, user.id);
-    if (existing) return { ok: true };
+    if (existing) {
+      await rememberParticipantOnDevice(existing.id);
+      return { ok: true };
+    }
   }
 
   // Avgiftsbelagda event får aldrig anslutas gratis här – de går via eventsidan
@@ -70,8 +74,10 @@ export async function joinEvent(eventId: string, rawName: string): Promise<Actio
   }
 
   if (user) {
-    // Inloggad → kontobaserat medlemskap (ingen deltagar-cookie behövs).
-    await createMembership(eventId, user.id, name, "none");
+    // Inloggad → kontobaserat medlemskap. Deltagar-cookien sätts ändå, som
+    // reserv om sessionen försvinner.
+    const membership = await createMembership(eventId, user.id, name, "none");
+    await rememberParticipantOnDevice(membership.id);
   } else {
     // Anonym gäst → legacy-token (gratis event, t.ex. en snabb tipskväll).
     const token = randomBytes(16).toString("hex");
@@ -166,6 +172,9 @@ export async function submitBets(eventId: string, selections: SubmitSelection[])
     .map((b) => b.gameId);
 
   await saveBets(participant.id, validated, removedGameIds);
+  // Kom ihåg deltagaren på just den enhet man faktiskt spelar från. Går man med
+  // på laptopen men tippar på mobilen är det mobilen som behöver reserven.
+  await rememberParticipantOnDevice(participant.id);
   revalidatePath("/events");
   return { ok: true };
 }

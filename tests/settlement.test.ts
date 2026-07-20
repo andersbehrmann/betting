@@ -49,6 +49,38 @@ describe("computeSettlement", () => {
     expect(inSum).toBe(outSum);
   });
 
+  // Regression: VM-finalen 2026. Tre spel saknade vinnare, så 75 kr samlades in
+  // utan att bokföras. Summan av nettona blev −75 och den gamla koden lade hela
+  // beloppet på spelaren med störst magnitud – Sara gick från −27 till +47 och
+  // alla blev tillsagda att swisha henne. En obalans i den storleken är alltid
+  // ett fel uppströms och ska aldrig tystas ner.
+  it("vägrar tysta bort en obalans som är större än avrundningsbrus", () => {
+    expect(() =>
+      computeSettlement([
+        P("sara", "Sara", -26.67),
+        P("daniel", "Daniel", 2.5),
+        P("jloo", "JLoo", -10.42),
+        P("anders", "Anders", 0),
+        P("annors", "Annors", -26.25),
+        P("kevin", "Kevin", -14.17),
+      ]),
+    ).toThrow(/går inte ihop/i);
+  });
+
+  it("accepterar öresavrundning (nettona summerar nästan till noll)", () => {
+    const t = computeSettlement([
+      P("sara", "Sara", -11.67),
+      P("daniel", "Daniel", 17.5),
+      P("jloo", "JLoo", 4.58),
+      P("anders", "Anders", 0),
+      P("annors", "Annors", -11.25),
+      P("kevin", "Kevin", 0.83),
+    ]);
+    const out = t.reduce((s, x) => s + x.amount, 0);
+    expect(out).toBeGreaterThan(0);
+    for (const x of t) expect(Number.isInteger(x.amount)).toBe(true);
+  });
+
   it("är deterministisk oavsett indataordning", () => {
     const a = computeSettlement([P("a", "A", 50), P("b", "B", 50), P("c", "C", -50), P("d", "D", -50)]);
     const b = computeSettlement([P("d", "D", -50), P("c", "C", -50), P("b", "B", 50), P("a", "A", 50)]);

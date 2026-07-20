@@ -2,8 +2,8 @@
 // Server-only – används av spel-/mina tips-sidorna och av submitBets.
 
 import "server-only";
-import { getCurrentUser, getParticipantToken } from "./auth";
-import { getMembership, getParticipantByToken } from "./queries";
+import { getCurrentUser, getParticipantToken, setParticipantToken } from "./auth";
+import { getMembership, getParticipantByToken, getOrCreateParticipantToken } from "./queries";
 import type { EventRow, ParticipantRow } from "./types";
 
 /**
@@ -28,6 +28,22 @@ export async function resolveParticipant(eventId: string): Promise<ParticipantRo
   }
 
   return null;
+}
+
+/**
+ * Kom ihåg deltagaren på den här enheten genom att sätta deltagar-cookien.
+ *
+ * Gör medlemskapet överlevnadsdugligt: tappas sessionen (utloggning, utgången
+ * cookie, eller att man nått servern via ett annat värdnamn än där man loggade
+ * in) hittar resolveParticipant ändå tillbaka till rätt rad. Utan det här står
+ * man som utelåst från sitt eget medlemskap och tvingas skapa en ny spelare.
+ *
+ * Anropas BARA från server actions – cookies kan inte sättas under rendering.
+ * Ger avsiktligt inte mer tillträde än en anonym deltagare redan har: betalgrind
+ * och kontobehörighet kontrolleras separat (hasPaidAccess resp. getCurrentUser).
+ */
+export async function rememberParticipantOnDevice(participantId: string): Promise<void> {
+  await setParticipantToken(await getOrCreateParticipantToken(participantId));
 }
 
 /**

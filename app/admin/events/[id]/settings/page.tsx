@@ -33,6 +33,7 @@ export default async function AdminSettingsPage({
     countStaffCards: event.countStaffCards,
     closestResultMode: event.closestResultMode,
     packageTiebreakExact: event.packageTiebreakExact,
+    noWinnerPolicy: event.noWinnerPolicy,
   };
 
   const [games, players] = await Promise.all([getGames(event.id), getPlayers(event.id)]);

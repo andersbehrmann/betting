@@ -20,6 +20,7 @@ export interface SettingsFormValues {
   countStaffCards: boolean;
   closestResultMode: "nearest" | "no_winner";
   packageTiebreakExact: boolean;
+  noWinnerPolicy: "refund" | "jackpot";
 }
 
 export function SettingsForm({
@@ -118,6 +119,20 @@ export function SettingsForm({
               { value: "nearest", label: "Närmast resultat vinner" },
             ]}
           />
+        </Field>
+
+        <Field label="Om ingen vinner ett spel – vad händer med potten?">
+          <Select
+            value={v.noWinnerPolicy}
+            onChange={(val) => set("noWinnerPolicy", val as "refund" | "jackpot")}
+            options={[
+              { value: "refund", label: "Insatserna betalas tillbaka" },
+              { value: "jackpot", label: "Potten rullar över till jackpotvinnarna" },
+            ]}
+          />
+          <p className="mt-1 text-xs text-muted">
+            Rullar potten över men ingen vann jackpoten heller betalas insatserna tillbaka.
+          </p>
         </Field>
 
         <Check

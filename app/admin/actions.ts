@@ -139,6 +139,7 @@ const settingsSchema = z.object({
   countStaffCards: z.boolean(),
   closestResultMode: z.enum(["nearest", "no_winner"]),
   packageTiebreakExact: z.boolean(),
+  noWinnerPolicy: z.enum(["refund", "jackpot"]),
 });
 
 export type SettingsInputRaw = z.input<typeof settingsSchema>;
@@ -158,6 +159,7 @@ function toEventSettings(raw: z.infer<typeof settingsSchema>): EventSettingsInpu
     countStaffCards: raw.countStaffCards,
     closestResultMode: raw.closestResultMode,
     packageTiebreakExact: raw.packageTiebreakExact,
+    noWinnerPolicy: raw.noWinnerPolicy,
   };
 }
 

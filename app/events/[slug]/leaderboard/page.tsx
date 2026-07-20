@@ -60,8 +60,12 @@ async function Board({
   isPoints: boolean;
 }) {
   const { participants } = await computeStandings(eventId);
+  // Bara den som faktiskt lagt tips hör hemma på tavlan. Att ha gått med (eller
+  // ha ett konto kopplat till eventet) räcker inte – annars dyker admin och
+  // andra som aldrig spelat upp bland spelarna med 0/0.
+  const played = participants.filter((p) => p.betCount > 0);
   // Poäng-event rankas på poäng, betting-event på netto.
-  const ranked = [...participants].sort((a, b) =>
+  const ranked = [...played].sort((a, b) =>
     isPoints ? b.points - a.points || b.wins - a.wins : b.net - a.net || b.wins - a.wins,
   );
 
@@ -137,11 +141,14 @@ async function AllTips({
   );
   const viewById = new Map(views.map((v) => [v.id, v]));
   const gameById = new Map(games.map((g) => [g.id, g]));
+  // Samma regel som på tavlan: den som inte lagt några tips är inte en spelare.
+  const betCount = new Set(bets.map((b) => b.participantId));
+  const played = participants.filter((p) => betCount.has(p.id));
 
   return (
     <div className="mt-6 space-y-2">
       <h2 className="px-1 font-display text-lg font-bold text-pitch">Allas tips</h2>
-      {participants.map((p) => {
+      {played.map((p) => {
         const mine = bets
           .filter((b) => b.participantId === p.id)
           .map((b) => ({ b, view: viewById.get(b.gameId), game: gameById.get(b.gameId) }))
