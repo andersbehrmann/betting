@@ -13,7 +13,7 @@ import {
   getPlayers,
   getBetsForParticipant,
 } from "@/lib/queries";
-import { resolveParticipant } from "@/lib/participants";
+import { resolveParticipant, hasPaidAccess } from "@/lib/participants";
 import { buildGameViews } from "@/lib/view";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { describeAnswer } from "@/lib/describe";
@@ -68,6 +68,8 @@ export default async function PlayPage({ params }: { params: Promise<{ slug: str
 async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<typeof getEventBySlug>>> }) {
   const participant = await resolveParticipant(event.id);
   const joined = participant !== null;
+  // Medlem men obetald avgift → får inte spela förrän webhooken bekräftat betalningen.
+  const unpaid = participant !== null && !hasPaidAccess(event, participant);
   const locked = !isGloballyOpen(event);
 
   return (
@@ -79,7 +81,21 @@ async function HomeContent({ event }: { event: NonNullable<Awaited<ReturnType<ty
         <EventBanner event={event} locked={locked} />
       )}
 
-      {!joined ? (
+      {unpaid ? (
+        <Card className="p-6 text-center">
+          <p className="font-display text-lg text-pitch">Avgiften är inte betald</p>
+          <p className="mt-1 text-sm text-muted">
+            Slutför betalningen så låses spelen upp. Har du precis betalat kan det ta någon
+            sekund innan det registreras.
+          </p>
+          <Link
+            href={`/events/${event.slug}`}
+            className="mt-3 inline-block font-medium text-grass hover:underline"
+          >
+            Till eventsidan →
+          </Link>
+        </Card>
+      ) : !joined ? (
         locked ? (
           <Card className="p-6 text-center">
             <p className="font-display text-lg text-pitch">Tipsningen är stängd</p>

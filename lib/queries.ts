@@ -298,11 +298,62 @@ export async function createMembership(
   return mapParticipant(rows[0]);
 }
 
-export async function setJoinFeeStatus(
+// --- Stripe-avstämning ---
+// Invariant: join_fee_status = 'paid' sätts ENDAST av markMembershipPaid, som i
+// sin tur bara anropas från den signaturverifierade Stripe-webhooken. Lägg inte
+// till en generisk statussättare här – då kan grinden kringgås.
+
+/** Kopplar en Checkout-session till medlemskapet så webhooken kan hitta tillbaka. */
+export async function setMembershipCheckoutSession(
   participantId: string,
-  status: "none" | "pending" | "paid" | "refunded",
+  sessionId: string,
 ): Promise<void> {
-  await sql`UPDATE participants SET join_fee_status = ${status} WHERE id = ${participantId}`;
+  await sql`
+    UPDATE participants
+    SET stripe_checkout_session_id = ${sessionId}, join_fee_status = 'pending'
+    WHERE id = ${participantId}`;
+}
+
+export async function getMembershipByCheckoutSession(
+  sessionId: string,
+): Promise<ParticipantRow | null> {
+  const rows = await sql`
+    SELECT * FROM participants WHERE stripe_checkout_session_id = ${sessionId}`;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+/** Markerar avgiften som betald. Idempotent – kan köras om utan bieffekt. */
+export async function markMembershipPaid(
+  participantId: string,
+  paymentIntentId: string | null,
+): Promise<void> {
+  await sql`
+    UPDATE participants
+    SET join_fee_status = 'paid',
+        join_fee_paid_at = now(),
+        stripe_payment_intent_id = COALESCE(${paymentIntentId}, stripe_payment_intent_id)
+    WHERE id = ${participantId}`;
+}
+
+/**
+ * Registrerar ett Stripe-event i idempotens-liggaren.
+ * Returnerar true bara första gången – då (och endast då) ska sidoeffekter köras.
+ */
+export async function recordStripeEvent(id: string, type: string): Promise<boolean> {
+  const rows = await sql`
+    INSERT INTO stripe_events (id, type) VALUES (${id}, ${type})
+    ON CONFLICT (id) DO NOTHING
+    RETURNING id`;
+  return rows.length > 0;
+}
+
+/**
+ * Tar bort en idempotens-rad. Används när hanteringen misslyckades efter att
+ * raden skapats – annars skulle Stripes omförsök hoppas över och betalningen
+ * aldrig registreras.
+ */
+export async function forgetStripeEvent(id: string): Promise<void> {
+  await sql`DELETE FROM stripe_events WHERE id = ${id}`;
 }
 
 // --- Games ---

@@ -15,7 +15,7 @@ import {
   type BetInput,
 } from "@/lib/queries";
 import { setParticipantToken, getCurrentUser } from "@/lib/auth";
-import { resolveParticipant } from "@/lib/participants";
+import { resolveParticipant, hasPaidAccess } from "@/lib/participants";
 import { isGameBettable, isGloballyOpen } from "@/lib/betting";
 import { getGameDefinition } from "@/lib/scoring/games";
 import { PACKAGE_GAME_KEY } from "@/lib/scoring/types";
@@ -127,6 +127,9 @@ export async function submitBets(eventId: string, selections: SubmitSelection[])
   // Konto-medlemskap ELLER legacy-token – resolvern garanterar rätt event.
   const participant = await resolveParticipant(event.id);
   if (!participant) return { ok: false, error: "Du är inte deltagare i det här eventet." };
+  if (!hasPaidAccess(event, participant)) {
+    return { ok: false, error: "Anslutningsavgiften är inte betald." };
+  }
 
   if (!isGloballyOpen(event)) {
     return { ok: false, error: "Tipsningen är stängd – tipsen är låsta." };
