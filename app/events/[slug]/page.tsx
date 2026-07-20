@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { AuthNav } from "@/components/auth/auth-nav";
 import { Card, Badge } from "@/components/ui";
 import { JoinButton } from "@/components/events/join-button";
+import { PayButton } from "@/components/events/pay-button";
 import { getCurrentUser } from "@/lib/auth";
 import { getEventBySlug, getMembership, getParticipants, getGames } from "@/lib/queries";
 import { formatCents } from "@/lib/utils";
@@ -12,10 +13,13 @@ export const dynamic = "force-dynamic";
 
 export default async function EventDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ betalning?: string }>;
 }) {
   const { slug } = await params;
+  const { betalning } = await searchParams;
   const event = await getEventBySlug(slug);
   if (!event || event.status === "draft") notFound();
 
@@ -62,6 +66,20 @@ export default async function EventDetailPage({
           {event.status === "closed" && <Badge tone="muted">Stängt</Badge>}
         </div>
 
+        {betalning === "klar" && (
+          <Card className="mt-6 border-grass/40 bg-grass/8 p-4">
+            <p className="text-sm font-medium text-grass">
+              Tack! Betalningen är mottagen. Så fort den bekräftats låses spelen upp –
+              ladda om sidan om det dröjer någon sekund.
+            </p>
+          </Card>
+        )}
+        {betalning === "avbruten" && (
+          <Card className="mt-6 p-4">
+            <p className="text-sm text-muted">Betalningen avbröts – du kan försöka igen.</p>
+          </Card>
+        )}
+
         <div className="mt-6">
           {!user ? (
             <Card className="p-6 text-center">
@@ -82,13 +100,23 @@ export default async function EventDetailPage({
                 </Link>
               </div>
             </Card>
+          ) : membership && event.joinFeeCents > 0 && membership.joinFeeStatus !== "paid" ? (
+            // Medlemskap finns men avgiften är obetald → slutför betalningen.
+            <Card className="p-6">
+              <Badge tone="red">Avgift ej betald</Badge>
+              <p className="mt-3 text-sm text-muted">
+                Slutför betalningen på {formatCents(event.joinFeeCents, event.currency)} för att
+                låsa upp spelen.
+              </p>
+              <div className="mt-4">
+                <PayButton eventId={event.id} label="Betala nu" />
+              </div>
+            </Card>
           ) : membership ? (
             <Card className="p-6">
               <div className="flex items-center gap-2">
                 <Badge tone="green">Du är med</Badge>
-                {event.joinFeeCents > 0 && membership.joinFeeStatus !== "paid" && (
-                  <Badge tone="red">Avgift ej betald</Badge>
-                )}
+                {event.joinFeeCents > 0 && <Badge tone="green">Avgift betald</Badge>}
               </div>
               {hasGames ? (
                 <Link
@@ -112,9 +140,13 @@ export default async function EventDetailPage({
               <p className="font-display text-lg text-pitch">
                 Anslut för {formatCents(event.joinFeeCents, event.currency)}
               </p>
-              <p className="mt-1 text-sm text-muted">
-                Kortbetalning via Stripe aktiveras i nästa steg.
+              <p className="mt-1 mb-4 text-sm text-muted">
+                Engångsavgift – betalas säkert med kort via Stripe.
               </p>
+              <PayButton
+                eventId={event.id}
+                label={`Betala ${formatCents(event.joinFeeCents, event.currency)} & gå med`}
+              />
             </Card>
           ) : (
             <JoinButton eventId={event.id} label="Gå med (gratis)" />

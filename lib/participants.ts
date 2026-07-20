@@ -4,7 +4,7 @@
 import "server-only";
 import { getCurrentUser, getParticipantToken } from "./auth";
 import { getMembership, getParticipantByToken } from "./queries";
-import type { ParticipantRow } from "./types";
+import type { EventRow, ParticipantRow } from "./types";
 
 /**
  * Deltagaren för ett event, eller null.
@@ -28,4 +28,14 @@ export async function resolveParticipant(eventId: string): Promise<ParticipantRo
   }
 
   return null;
+}
+
+/**
+ * Har deltagaren tillträde till spelen? Gratis-event: alltid. Avgiftsbelagda:
+ * bara när avgiften är betald (sätts enbart av Stripe-webhooken), så en avbruten
+ * eller manipulerad retur från Checkout aldrig ger tillträde.
+ */
+export function hasPaidAccess(event: EventRow, participant: ParticipantRow): boolean {
+  if (event.joinFeeCents <= 0) return true;
+  return participant.joinFeeStatus === "paid";
 }
