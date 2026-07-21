@@ -12,7 +12,7 @@ import {
 import { computeStandings } from "@/lib/standings";
 import { buildGameViews } from "@/lib/view";
 import { describeAnswer } from "@/lib/describe";
-import { formatMoney, cn } from "@/lib/utils";
+import { formatKronor, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +83,11 @@ async function Board({
             <span className="text-right">{isPoints ? "Rätt" : "Vinster"}</span>
             <span className="text-right">{isPoints ? "Poäng" : "Netto"}</span>
           </div>
-          {ranked.map((p, i) => (
+          {ranked.map((p, i) => {
+            // Avrunda en gång och låt tecken och färg följa den visade siffran –
+            // annars får ett netto på 0,40 kr ett plustecken framför "0 kr".
+            const net = Math.round(p.net) || 0;
+            return (
             <div key={p.id} className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-3 px-4 py-3">
               <span className={cn("font-display text-lg", i === 0 ? "text-gold" : "text-muted")}>
                 {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
@@ -98,15 +102,16 @@ async function Board({
                 <span
                   className={cn(
                     "text-right font-display font-bold tabular-nums",
-                    p.net > 0 ? "text-win" : p.net < 0 ? "text-lose" : "text-muted",
+                    net > 0 ? "text-win" : net < 0 ? "text-lose" : "text-muted",
                   )}
                 >
-                  {p.net > 0 ? "+" : ""}
-                  {formatMoney(p.net, currency)}
+                  {net > 0 ? "+" : ""}
+                  {formatKronor(net, currency)}
                 </span>
               )}
             </div>
-          ))}
+            );
+          })}
         </Card>
       )}
     </div>
