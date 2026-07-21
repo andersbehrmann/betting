@@ -14,7 +14,7 @@ import { buildGameViews } from "@/lib/view";
 import { describeAnswer } from "@/lib/describe";
 import { SettlementList } from "@/components/settlement-list";
 import { computeStandings } from "@/lib/standings";
-import { formatMoney, cn } from "@/lib/utils";
+import { formatMoney, formatKronor, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -124,18 +124,18 @@ async function Receipt({
           ett räknefel, eftersom vinst − insats då inte går ihop. */}
       {me && (
         <div className={cn("grid gap-2", me.unwonCredit > 0 ? "grid-cols-2" : "grid-cols-3")}>
-          <StatPill label="Insats" value={formatMoney(me.totalStake, event.currency)} />
-          <StatPill label="Vinst" value={formatMoney(me.totalWinnings, event.currency)} tone="green" />
+          <StatPill label="Insats" value={formatKronor(me.totalStake, event.currency)} />
+          <StatPill label="Vinst" value={formatKronor(me.totalWinnings, event.currency)} tone="green" />
           {me.unwonCredit > 0 && (
             <StatPill
               label={standings.rolledOverToJackpot > 0 ? "Från jackpot" : "Återbetalt"}
-              value={formatMoney(me.unwonCredit, event.currency)}
+              value={formatKronor(me.unwonCredit, event.currency)}
               tone="green"
             />
           )}
           <StatPill
             label="Netto"
-            value={formatMoney(me.net, event.currency)}
+            value={formatKronor(me.net, event.currency)}
             tone={me.net >= 0 ? "green" : "neutral"}
           />
         </div>

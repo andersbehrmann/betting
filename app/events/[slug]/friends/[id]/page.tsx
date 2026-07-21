@@ -12,7 +12,7 @@ import {
   getFriendLeaderboardParticipantIds,
 } from "@/lib/queries";
 import { computeStandings } from "@/lib/standings";
-import { formatMoney, cn } from "@/lib/utils";
+import { formatKronor, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +100,11 @@ export default async function FriendLeaderboardPage({
                 <span className="text-right">{isPoints ? "Rätt" : "Vinster"}</span>
                 <span className="text-right">{isPoints ? "Poäng" : "Netto"}</span>
               </div>
-              {ranked.map((p, i) => (
+              {ranked.map((p, i) => {
+                // Samma avrundning som stora tavlan: tecken och färg följer den
+                // visade siffran, inte örena bakom.
+                const net = Math.round(p.net) || 0;
+                return (
                 <div
                   key={p.id}
                   className="grid grid-cols-[2rem_1fr_auto_auto] items-center gap-3 px-4 py-3"
@@ -118,15 +122,16 @@ export default async function FriendLeaderboardPage({
                     <span
                       className={cn(
                         "text-right font-display font-bold tabular-nums",
-                        p.net > 0 ? "text-win" : p.net < 0 ? "text-lose" : "text-muted",
+                        net > 0 ? "text-win" : net < 0 ? "text-lose" : "text-muted",
                       )}
                     >
-                      {p.net > 0 ? "+" : ""}
-                      {formatMoney(p.net, event.currency)}
+                      {net > 0 ? "+" : ""}
+                      {formatKronor(net, event.currency)}
                     </span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </Card>
           )}
         </div>

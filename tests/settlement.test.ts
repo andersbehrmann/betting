@@ -81,6 +81,50 @@ describe("computeSettlement", () => {
     for (const x of t) expect(Number.isInteger(x.amount)).toBe(true);
   });
 
+  // Den gamla guarden summerade nettona EFTER heltalsavrundning och tillät
+  // ceil(n/2)+1 kr i avvikelse – 6 kr vid 10 deltagare. Ett äkta hål på 5 kr
+  // (en pott som samlats in men aldrig delats ut) passerade alltså tyst och
+  // lades i sin helhet på spelaren med störst netto. Kontrollen görs nu på de
+  // oavrundade nettona, där 5 kr aldrig kan vara avrundningsbrus.
+  it("vägrar tysta bort ett hål på 5 kr hos 10 deltagare", () => {
+    expect(() =>
+      computeSettlement([
+        P("a", "A", 10),
+        P("b", "B", 5),
+        P("c", "C", -8),
+        P("d", "D", -6),
+        P("e", "E", -4),
+        P("f", "F", -2),
+        P("g", "G", 0),
+        P("h", "H", 0),
+        P("i", "I", 0),
+        P("j", "J", 0),
+      ]),
+    ).toThrow(/går inte ihop/i);
+  });
+
+  it("accepterar öresavrundning även i en stor liga", () => {
+    // 12 deltagare vars netton summerar till −0,03 – ren round2-rest uppströms.
+    const t = computeSettlement([
+      P("a", "A", 25.01),
+      P("b", "B", 12.49),
+      P("c", "C", 8.33),
+      P("d", "D", 4.17),
+      P("e", "E", -2.5),
+      P("f", "F", -3.33),
+      P("g", "G", -4.17),
+      P("h", "H", -5),
+      P("i", "I", -6.67),
+      P("j", "J", -8.33),
+      P("k", "K", -10),
+      P("l", "L", -10.03),
+    ]);
+    for (const x of t) expect(Number.isInteger(x.amount)).toBe(true);
+    // Allt som betalas ut ska också tas emot.
+    const paid = t.reduce((s, x) => s + x.amount, 0);
+    expect(paid).toBeGreaterThan(0);
+  });
+
   it("är deterministisk oavsett indataordning", () => {
     const a = computeSettlement([P("a", "A", 50), P("b", "B", 50), P("c", "C", -50), P("d", "D", -50)]);
     const b = computeSettlement([P("d", "D", -50), P("c", "C", -50), P("b", "B", 50), P("a", "A", 50)]);
