@@ -64,7 +64,7 @@ export function SettingsForm({
 
   return (
     <Card className="p-5">
-      <h2 className="font-display text-lg font-bold text-pitch">Matchinställningar</h2>
+      <h2 className="font-display text-lg font-bold text-pitch">Eventinställningar</h2>
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field label="Eventnamn">
           <Input value={v.name} onChange={(e) => set("name", e.target.value)} required />
@@ -72,19 +72,19 @@ export function SettingsForm({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Lag 1">
-            <Input value={v.teamOne} onChange={(e) => set("teamOne", e.target.value)} required />
+            <Input value={v.teamOne} onChange={(e) => set("teamOne", e.target.value)} />
           </Field>
           <Field label="Lag 2">
-            <Input value={v.teamTwo} onChange={(e) => set("teamTwo", e.target.value)} required />
+            <Input value={v.teamTwo} onChange={(e) => set("teamTwo", e.target.value)} />
           </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Avspark (matchstart)">
-            <Input type="datetime-local" value={v.matchStart} onChange={(e) => set("matchStart", e.target.value)} required />
+          <Field label="Eventstart">
+            <Input type="datetime-local" value={v.matchStart} onChange={(e) => set("matchStart", e.target.value)} />
           </Field>
           <Field label="Tipsstopp (deadline)">
-            <Input type="datetime-local" value={v.bettingDeadline} onChange={(e) => set("bettingDeadline", e.target.value)} required />
+            <Input type="datetime-local" value={v.bettingDeadline} onChange={(e) => set("bettingDeadline", e.target.value)} />
           </Field>
         </div>
         <p className="-mt-2 text-xs text-muted">Tider tolkas i svensk tid (Europe/Stockholm).</p>
