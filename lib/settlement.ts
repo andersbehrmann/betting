@@ -26,30 +26,46 @@ export interface Transfer {
  * det pekar ut fel person som vinnare. Se lib/scoring/unwon.ts.
  */
 export function computeSettlement(participants: SettlementInput[]): Transfer[] {
-  // 1. Heltalsavrunda nettona.
-  const rounded = participants.map((p) => ({ id: p.id, name: p.name, net: Math.round(p.net) }));
-
-  // 2. Avvisa allt som är större än avrundningsbrus. Varje netto kan flytta sig
-  //    max ±0,5 kr vid heltalsavrundning, plus någon ensam öre från lagrade
-  //    utbetalningar med decimaler.
-  const residual = rounded.reduce((s, p) => s + p.net, 0);
-  const tolerance = Math.ceil(rounded.length / 2) + 1;
-  if (Math.abs(residual) > tolerance) {
+  // 1. Kontrollera obalansen på de OAVRUNDADE nettona, INNAN avrundning. I en
+  //    korrekt sammanställning bevaras pengarna och de summerar till exakt 0.
+  //    Det enda som får dem att avvika är öresavrundning uppströms: varje netto
+  //    kommer redan avrundat till hela ören (round2 i lib/standings.ts), vilket
+  //    kan flytta summan som mest ett par ören per deltagare. Allt större är ett
+  //    riktigt bokföringshål – t.ex. en pott utan vinnare – och får aldrig
+  //    tystas ner genom att skyfflas över på en enskild spelare.
+  //
+  //    Att i stället summera EFTER Math.round dolde hålet: heltalsavrundningen
+  //    lägger själv till upp till ±0,5 kr per deltagare, så en tolerans som
+  //    rymde det bruset (~n/2 kr) svalde också ett verkligt hål på flera kronor.
+  const rawResidual = participants.reduce((s, p) => s + p.net, 0);
+  const tolerance = 0.02 * participants.length + 0.005;
+  if (Math.abs(rawResidual) > tolerance) {
+    // Felsökningstext för admin – här visas ören med flit (till skillnad från
+    // tavlan och swishlistan), eftersom det är örena som pekar ut var pengarna
+    // tog vägen. Avrundat till kronor skulle en liten obalans bli "0 kr".
+    const belopp = (Math.round(rawResidual * 100) / 100).toLocaleString("sv-SE");
     throw new Error(
-      `Sammanräkningen går inte ihop: nettona summerar till ${residual} kr i stället för 0. ` +
+      `Sammanräkningen går inte ihop: nettona summerar till ${belopp} kr i stället för 0. ` +
         `Det beror på pengar som samlats in men inte delats ut – kontrollera spel utan vinnare.`,
     );
   }
 
-  // 3. Jämna ut den kvarvarande öresavrundningen på posten med störst magnitud.
-  if (residual !== 0 && rounded.length > 0) {
+  // 2. Heltalsavrunda nettona.
+  const rounded = participants.map((p) => ({ id: p.id, name: p.name, net: Math.round(p.net) }));
+
+  // 3. Heltalsavrundningen kan lämna en liten rest (summan av avrundade netton
+  //    ≠ 0). Det är rent avrundningsbrus – den verkliga obalansen är redan
+  //    godkänd ovan – så det är tryggt att jämna ut resten på posten med störst
+  //    magnitud.
+  const roundingResidual = rounded.reduce((s, p) => s + p.net, 0);
+  if (roundingResidual !== 0 && rounded.length > 0) {
     const target = [...rounded].sort(
       (a, b) => Math.abs(b.net) - Math.abs(a.net) || (a.id < b.id ? -1 : 1),
     )[0];
-    target.net -= residual;
+    target.net -= roundingResidual;
   }
 
-  // 3. Dela upp i gäldenärer (ska betala) och fordringsägare (ska få).
+  // 4. Dela upp i gäldenärer (ska betala) och fordringsägare (ska få).
   const debtors = rounded
     .filter((p) => p.net < 0)
     .map((p) => ({ id: p.id, name: p.name, remaining: -p.net }))
@@ -59,7 +75,7 @@ export function computeSettlement(participants: SettlementInput[]): Transfer[] {
     .map((p) => ({ id: p.id, name: p.name, remaining: p.net }))
     .sort((a, b) => b.remaining - a.remaining || (a.id < b.id ? -1 : 1));
 
-  // 4. Girig matchning.
+  // 5. Girig matchning.
   const transfers: Transfer[] = [];
   let i = 0;
   let j = 0;
